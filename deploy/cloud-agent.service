@@ -1,0 +1,27 @@
+[Unit]
+Description=CloudEase Lite host monitoring agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cloudease-agent
+Group=cloudease-agent
+EnvironmentFile=/etc/cloudease-lite/agent.env
+ExecStart=/opt/cloudease-lite/cloud-agent --server ${CLOUDEASE_SERVER} --token-file /etc/cloudease-lite/agent-token --advertise-ip ${CLOUDEASE_IP}
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target
