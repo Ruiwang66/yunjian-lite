@@ -6,6 +6,7 @@ import (
 	"cloudease-lite/server/models"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 	"log"
 	"os"
@@ -39,7 +40,14 @@ func Open(dir string) (*gorm.DB, error) {
 			return nil, err
 		}
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Server{}, &models.Metric{}, &models.SystemLog{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Server{}, &models.Metric{}, &models.SystemLog{}, &models.Role{}, &models.DockerContainer{}, &models.Service{}, &models.File{}, &models.OperationLog{}, &models.ManagementTask{}); err != nil {
+		return nil, err
+	}
+	roles := []models.Role{{Name: "admin", Description: "全部权限及用户管理"}, {Name: "operator", Description: "管理服务器和白名单运维操作"}, {Name: "viewer", Description: "只读监控及运维数据"}}
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&roles).Error; err != nil {
+		return nil, err
+	}
+	if err := db.Model(&models.User{}).Where("role = ? OR role IS NULL", "").Update("role", "admin").Error; err != nil {
 		return nil, err
 	}
 	if err := privatefs.File(path); err != nil {

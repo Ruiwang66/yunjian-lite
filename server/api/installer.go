@@ -33,7 +33,8 @@ func (a *API) agentInstallAuth(c *gin.Context) {
 		return
 	}
 	var s models.Server
-	err := a.DB.Select("id").Where("token = ?", service.HashToken(strings.TrimPrefix(header, "Bearer "))).First(&s).Error
+	tokenHash := service.HashToken(strings.TrimPrefix(header, "Bearer "))
+	err := a.DB.Select("id").Where("token = ?", tokenHash).First(&s).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		fail(c, 401, "连接密钥无效")
 		return
@@ -42,5 +43,7 @@ func (a *API) agentInstallAuth(c *gin.Context) {
 		dbError(c)
 		return
 	}
+	c.Set("agent_server_id", s.ID)
+	c.Set("agent_key_hash", tokenHash)
 	c.Next()
 }

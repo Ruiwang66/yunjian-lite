@@ -6,6 +6,13 @@ import Dashboard from "./views/Dashboard.vue";
 import Server from "./views/Server.vue";
 import Logs from "./views/Logs.vue";
 import Public from "./views/Public.vue";
+const Docker = () => import("./views/Docker.vue");
+const Services = () => import("./views/Services.vue");
+const Files = () => import("./views/Files.vue");
+const Security = () => import("./views/Security.vue");
+const System = () => import("./views/System.vue");
+const Operations = () => import("./views/Operations.vue");
+const Settings = () => import("./views/Settings.vue");
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -16,6 +23,13 @@ const router = createRouter({
     { path: "/servers", component: Dashboard },
     { path: "/servers/:id", component: Server },
     { path: "/logs", component: Logs },
+    { path: "/docker", component: Docker },
+    { path: "/services", component: Services },
+    { path: "/files", component: Files },
+    { path: "/security", component: Security },
+    { path: "/system", component: System },
+    { path: "/operations", component: Operations },
+    { path: "/settings", component: Settings },
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 });

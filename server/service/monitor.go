@@ -19,6 +19,9 @@ func Monitor(ctx context.Context, db *gorm.DB, offline time.Duration, retentionD
 			return
 		case now := <-ticker.C:
 			now = now.UTC() // SQLite compares timestamp strings; query bounds must use UTC.
+			if err := ExpireOperations(db, now); err != nil {
+				log.Printf("operation cleanup: %v", err)
+			}
 			changed := false
 			err := db.Transaction(func(tx *gorm.DB) error {
 				items := []models.Server{}

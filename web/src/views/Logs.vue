@@ -28,7 +28,10 @@ async function refresh() {
       }),
       api.servers(),
     ]);
-    logs.value = l.items.map((item) => ({ ...item, message: eventMessage(item.message) }));
+    logs.value = l.items.map((item) => ({
+      ...item,
+      message: eventMessage(item.message),
+    }));
     total.value = l.total;
     servers.value = s;
     error.value = "";
@@ -52,6 +55,10 @@ watch([level, serverID], () => {
 });
 </script>
 <template>
+  <div class="log-tabs">
+    <router-link to="/logs" class="active">系统事件</router-link
+    ><router-link to="/operations">运维操作</router-link>
+  </div>
   <div class="page-heading">
     <div>
       <span class="eyebrow">SYSTEM EVENTS</span>

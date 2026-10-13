@@ -31,7 +31,7 @@ func env(key, fallback string) string {
 	return fallback
 }
 func Load() (Config, error) {
-	days, err := strconv.Atoi(env("METRIC_RETENTION_DAYS", "7"))
+	days, err := strconv.Atoi(env("METRIC_RETENTION_DAYS", "30"))
 	if err != nil || days < 1 || days > 365 {
 		return Config{}, fmt.Errorf("METRIC_RETENTION_DAYS must be 1-365")
 	}

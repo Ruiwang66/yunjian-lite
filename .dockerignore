@@ -21,8 +21,19 @@ backups
 **/*.p12
 **/__pycache__
 安全提示词.txt
+*提示词*.txt
+docs/screenshots/
+docs/SYNC-*.md
+docs/UPDATE-*.md
+docs/ENABLE-MANAGEMENT-*.md
+docs/FIX-PUBLIC-IP-*.md
+docs/UI-*.md
 
 *.log
 logs/
 id_rsa
 id_ed25519
+
+# Empty data seed for the non-root prebuilt Docker image
+!deploy/data/
+!deploy/data/.keep

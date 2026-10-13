@@ -33,3 +33,11 @@ id_ed25519
 /docs/screenshots/
 /docs/SYNC-*.md
 /docs/UPDATE-*.md
+/docs/ENABLE-MANAGEMENT-*.md
+/docs/FIX-PUBLIC-IP-*.md
+/docs/UI-*.md
+*提示词*.txt
+
+# Empty data seed for the non-root prebuilt Docker image
+!deploy/data/
+!deploy/data/.keep

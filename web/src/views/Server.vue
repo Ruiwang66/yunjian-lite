@@ -5,6 +5,7 @@ import { ArrowLeft, KeyRound, Pencil, Trash2 } from "lucide-vue-next";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { api, publicApi } from "../api";
 const props = defineProps({ publicView: Boolean });
+import { canOperate } from "../management";
 import { revision } from "../state";
 import { bytes, date, ago, uptime, statusText, eventMessage } from "../format";
 import MetricBar from "../components/MetricBar.vue";
@@ -129,7 +130,13 @@ watch(() => route.params.id, refresh);
           <span class="separator">/</span> {{ server.arch || "—" }}
         </p>
       </div>
-      <el-dropdown v-if="!publicView" trigger="click"
+      <router-link
+        v-if="!publicView"
+        :to="`/system?server_id=${server.id}`"
+        class="text-link"
+        >系统与运维信息</router-link
+      >
+      <el-dropdown v-if="!publicView && canOperate" trigger="click"
         ><el-button>管理服务器</el-button
         ><template #dropdown
           ><el-dropdown-menu
@@ -247,7 +254,12 @@ watch(() => route.params.id, refresh);
     </div></template
   >
   <div v-else-if="!error" class="empty-state">正在加载服务器…</div>
-  <RemoveServer v-if="!publicView && server" v-model="removeOpen" :server="server" @removed="router.push('/servers')" />
+  <RemoveServer
+    v-if="!publicView && server"
+    v-model="removeOpen"
+    :server="server"
+    @removed="router.push('/servers')"
+  />
   <el-dialog
     v-if="!publicView"
     v-model="tokenOpen"

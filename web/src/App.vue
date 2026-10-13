@@ -10,6 +10,12 @@ import {
   KeyRound,
   Radio,
   Menu,
+  Container,
+  Cog,
+  Folder,
+  Shield,
+  Settings,
+  Cpu,
 } from "lucide-vue-next";
 import { ElMessage } from "element-plus";
 import { api } from "./api";
@@ -98,11 +104,21 @@ onUnmounted(() => {
             >02</span
           ></router-link
         >
-        <router-link to="/logs" :class="{ active: route.path === '/logs' }"
-          ><ScrollText :size="18" />系统日志<span class="nav-short"
+        <router-link
+          to="/logs"
+          :class="{ active: ['/logs', '/operations'].includes(route.path) }"
+          ><ScrollText :size="18" />日志<span class="nav-short"
             >03</span
           ></router-link
         >
+        <router-link to="/docker"><Container :size="18" />Docker<span class="nav-short">04</span></router-link>
+        <router-link to="/services"><Cog :size="18" />服务管理<span class="nav-short">05</span></router-link>
+        <router-link to="/files"><Folder :size="18" />文件管理<span class="nav-short">06</span></router-link>
+        <router-link to="/security"
+          ><Shield :size="18" />命令与安全<span class="nav-short">07</span></router-link
+        >
+        <router-link to="/system"><Cpu :size="18" />系统信息<span class="nav-short">08</span></router-link>
+        <router-link to="/settings"><Settings :size="18" />设置<span class="nav-short">09</span></router-link>
       </nav>
       <div class="sidebar-foot">
         <div class="release-card">
@@ -111,7 +127,7 @@ onUnmounted(() => {
           >
         </div>
         <div class="version-row">
-          <span>v0.1.0 · MVP</span><span>开源 / MIT</span>
+          <span>v0.2.0</span><span>开源 / MIT</span>
         </div>
       </div>
     </aside>
@@ -120,11 +136,17 @@ onUnmounted(() => {
         <span class="breadcrumb"
           >工作空间 <span>/</span>
           {{
-            route.path === "/admin"
-              ? "概览"
-              : route.path === "/logs"
-                ? "系统日志"
-                : "服务器"
+            {
+              "/admin": "概览",
+              "/logs": "系统事件",
+              "/operations": "运维日志",
+              "/docker": "Docker",
+              "/services": "服务管理",
+              "/files": "文件管理",
+              "/security": "命令与安全",
+              "/system": "系统信息",
+              "/settings": "设置",
+            }[route.path] || "服务器"
           }}</span
         >
         <div class="top-actions">
@@ -134,7 +156,10 @@ onUnmounted(() => {
             >{{ live ? "实时连接" : "轮询刷新" }}</span
           ><el-dropdown trigger="click"
             ><button class="user-button">
-              <span class="avatar">A</span><span>admin</span></button
+              <span class="avatar">{{
+                user?.username?.slice(0, 1).toUpperCase()
+              }}</span
+              ><span>{{ user?.username }}</span></button
             ><template #dropdown
               ><el-dropdown-menu
                 ><el-dropdown-item @click="passwordOpen = true"
@@ -163,7 +188,7 @@ onUnmounted(() => {
     </div>
     <el-dialog
       v-model="passwordOpen"
-      title="修改管理员密码"
+      title="修改账户密码"
       width="min(440px, 92vw)"
       @closed="form = { current_password: '', new_password: '' }"
       ><el-form label-position="top" @submit.prevent="changePassword"

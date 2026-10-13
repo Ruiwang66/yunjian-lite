@@ -15,6 +15,7 @@ import {
 } from "lucide-vue-next";
 import { api, publicApi } from "../api";
 const props = defineProps({ publicView: Boolean });
+import { canOperate } from "../management";
 import { revision } from "../state";
 import { ago, percent, bytes, statusText, date, eventMessage } from "../format";
 import MetricBar from "../components/MetricBar.vue";
@@ -103,7 +104,7 @@ watch(revision, refresh);
       <p>关注关键指标，让每一台服务器保持最佳状态。</p>
     </div>
     <el-button
-      v-if="!publicView"
+      v-if="!publicView && canOperate"
       type="primary"
       size="large"
       @click="addOpen = true"
@@ -209,7 +210,7 @@ watch(revision, refresh);
         }}
       </p>
       <el-button
-        v-if="!publicView && !servers.length"
+        v-if="!publicView && canOperate && !servers.length"
         type="primary"
         @click="addOpen = true"
         >添加服务器</el-button
@@ -299,7 +300,11 @@ watch(revision, refresh);
     <span
       ><i class="status-dot neutral"></i
       >{{ loaded ? `最近同步 ${ago(loaded, now)}` : "等待同步" }}</span
-    ><span>数据保留 7 天 · 监控客户端采集周期 4 秒</span>
+    ><span>数据保留 30 天 · 监控客户端采集周期 4 秒</span>
   </div>
-  <AddServer v-if="!publicView" v-model="addOpen" @created="refresh" />
+  <AddServer
+    v-if="!publicView && canOperate"
+    v-model="addOpen"
+    @created="refresh"
+  />
 </template>

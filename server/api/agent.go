@@ -4,6 +4,7 @@ import (
 	"cloudease-lite/server/models"
 	"cloudease-lite/server/service"
 	"cloudease-lite/shared"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -60,7 +61,7 @@ func (a *API) report(c *gin.Context) {
 	if !decodeJSON(c, &report) {
 		return
 	}
-	if !validReport(report) {
+	if !validReport(report) || !validExtensions(report) {
 		fail(c, 400, "监控数据格式无效")
 		return
 	}
@@ -92,6 +93,37 @@ func (a *API) report(c *gin.Context) {
 			ip = c.ClientIP()
 		}
 		updates := map[string]any{"ip": ip, "status": "online", "os": report.OS, "platform": report.Platform, "platform_version": report.PlatformVersion, "arch": report.Arch, "cpu_cores": report.CPUCores, "uptime": report.Uptime, "last_seen": now}
+		if report.System != nil {
+			system := *report.System
+			// Prefer the observed authenticated peer. When the agent runs on this same
+			// host behind a local reverse proxy, use its already-recorded public address.
+			publicIP := net.ParseIP(c.ClientIP())
+			if publicIP == nil || !publicIP.IsGlobalUnicast() || publicIP.IsPrivate() {
+				publicIP = net.ParseIP(s.IP)
+			}
+			if publicIP != nil && publicIP.IsGlobalUnicast() && !publicIP.IsPrivate() {
+				ip := publicIP.String()
+				seen := false
+				for _, v := range system.PublicIPs {
+					if v == ip {
+						seen = true
+					}
+				}
+				if !seen && len(system.PublicIPs) < 32 {
+					system.PublicIPs = append(system.PublicIPs, ip)
+				}
+			}
+			raw, _ := json.Marshal(system)
+			updates["system_json"] = string(raw)
+		}
+		if report.Management != nil {
+			raw, _ := json.Marshal(report.Management)
+			updates["management_json"] = string(raw)
+			updates["management_seen_at"] = now
+		} else {
+			updates["management_json"] = ""
+			updates["management_seen_at"] = nil
+		}
 		if report.SentAt != 0 {
 			updates["last_report_at"] = report.SentAt
 			updates["last_report_nonce"] = report.Nonce

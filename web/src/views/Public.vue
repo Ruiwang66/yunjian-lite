@@ -28,7 +28,7 @@ const route = useRoute();
     </main>
     <footer class="footer">
       <span>CloudEase Lite · 服务器监控</span
-      ><span>每 4 秒采集 · 数据保留 7 天</span>
+      ><span>每 4 秒采集 · 数据保留 30 天</span>
     </footer>
   </div>
 </template>

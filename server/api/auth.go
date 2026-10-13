@@ -22,10 +22,6 @@ func (a *API) login(c *gin.Context) {
 			return
 		}
 	}
-	if !a.allowLogin(c.ClientIP()) {
-		fail(c, 429, "登录尝试过多，请 15 分钟后再试")
-		return
-	}
 	var in struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -35,6 +31,12 @@ func (a *API) login(c *gin.Context) {
 	}
 	if len(in.Username) == 0 || len(in.Password) == 0 || len(in.Username) > 64 || len(in.Password) > 72 {
 		fail(c, 400, "请输入有效的账号和密码")
+		return
+	}
+	// A viewer's successful login must not erase failures against the admin account.
+	attemptKey := c.ClientIP() + "\x00" + in.Username
+	if !a.allowLogin(attemptKey) {
+		fail(c, 429, "此来源与账号的登录尝试过多，请 15 分钟后再试")
 		return
 	}
 	var u models.User
@@ -60,9 +62,10 @@ func (a *API) login(c *gin.Context) {
 		return
 	}
 	a.loginMu.Lock()
-	delete(a.attempts, c.ClientIP())
+	delete(a.attempts, attemptKey)
 	a.loginMu.Unlock()
 	a.cookie(c, raw, int(a.Config.SessionTTL.Seconds()))
+	c.Set("user", u)
 	c.JSON(200, gin.H{"user": u})
 }
 func (a *API) me(c *gin.Context) {
@@ -117,7 +120,9 @@ func (a *API) password(c *gin.Context) {
 		dbError(c)
 		return
 	}
-	_ = os.Remove(filepath.Join(a.Config.DataDir, "admin-password.txt"))
+	if u.Username == "admin" {
+		_ = os.Remove(filepath.Join(a.Config.DataDir, "admin-password.txt"))
+	}
 	a.cookie(c, "", -1)
 	c.JSON(200, gin.H{"ok": true})
 }

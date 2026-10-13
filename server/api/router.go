@@ -6,6 +6,7 @@ import (
 	"cloudease-lite/server/models"
 	"cloudease-lite/server/service"
 	live "cloudease-lite/server/websocket"
+	"cloudease-lite/shared"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -68,9 +69,9 @@ func (a *API) Router() *gin.Engine {
 			fail(c, 503, "database unavailable")
 			return
 		}
-		c.JSON(200, gin.H{"status": "ok", "version": "0.1.0"})
+		c.JSON(200, gin.H{"status": "ok", "version": shared.Version})
 	})
-	r.POST("/api/auth/login", a.login)
+	r.POST("/api/auth/login", a.audit, a.login)
 	r.GET("/uninstall-client.sh", serveInstaller("uninstall.sh"))
 	r.GET("/uninstall-client.ps1", serveInstaller("uninstall.ps1"))
 	r.GET("/install-client.sh", serveInstaller("agent.sh"))
@@ -80,7 +81,11 @@ func (a *API) Router() *gin.Engine {
 	agentInstall := r.Group("/api/agent")
 	agentInstall.Use(a.agentInstallAuth)
 	agentInstall.POST("/report", a.report)
-	agentInstall.GET("/check", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
+	agentInstall.GET("/operations/next", a.nextOperation)
+	agentInstall.POST("/operations/result", a.operationResult)
+	agentInstall.GET("/check", func(c *gin.Context) {
+		c.JSON(200, gin.H{"ok": true, "version": shared.Version, "management_protocol": 1})
+	})
 	agentInstall.GET("/downloads/:file", a.downloadAgent)
 	agentInstall.GET("/downloads/:file/sha256", a.downloadChecksum)
 	r.GET("/api/public/servers", a.publicServers)
@@ -90,7 +95,8 @@ func (a *API) Router() *gin.Engine {
 		a.Hub.Serve(c.Writer, c.Request, time.Now().Add(24*time.Hour), func() bool { return true }, c.ClientIP())
 	})
 	private := r.Group("/api")
-	private.Use(a.auth)
+	private.Use(a.auth, a.audit, a.permissions)
+	a.managementRoutes(private)
 	private.GET("/auth/me", a.me)
 	private.POST("/auth/logout", a.logout)
 	private.POST("/auth/password", a.password)
@@ -138,6 +144,12 @@ func (a *API) auth(c *gin.Context) {
 		}
 		return
 	}
+	var u models.User
+	if a.DB.First(&u, s.UserID).Error != nil {
+		dbError(c)
+		return
+	}
+	c.Set("user", u)
 	c.Set("session", s)
 	c.Next()
 }

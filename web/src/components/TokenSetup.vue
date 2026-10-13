@@ -4,13 +4,18 @@ import { Copy, Download, Check } from "lucide-vue-next";
 import { ElMessage } from "element-plus";
 const props = defineProps({ token: String }),
   platform = ref("linux"),
-  copied = ref(false);
+  copied = ref(false),
+  management = ref(false);
 const shellQuote = (value) =>
   "'" + String(value).replaceAll("'", "'\"'\"'") + "'";
 const psQuote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
 const safeOrigin = computed(() => {
   const url = new URL(location.origin);
-  return url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname));
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+  );
 });
 const command = computed(() => {
   if (!safeOrigin.value) return "";
@@ -41,7 +46,7 @@ const command = computed(() => {
     "  else",
     '    echo "请先安装 curl 或 wget。" >&2; exit 1',
     "  fi",
-    `  bash "$script" --server ${shellQuote(origin)}`,
+    `  bash "$script" --server ${shellQuote(origin)}${management.value ? " --management" : ""}`,
     ")",
   ].join("\n");
 });
@@ -58,7 +63,10 @@ async function copy(value = command.value, isKey = false) {
       if (!ok) throw new Error("copy failed");
     }
     if (isKey) ElMessage.success("连接密钥已复制");
-    else { copied.value = true; setTimeout(() => (copied.value = false), 2000); }
+    else {
+      copied.value = true;
+      setTimeout(() => (copied.value = false), 2000);
+    }
   } catch {
     ElMessage.info("请手动选择并复制安装命令");
   }
@@ -74,9 +82,21 @@ async function copy(value = command.value, isKey = false) {
     <p class="muted">
       先复制安装命令到被监控服务器执行，再复制下方连接密钥，在安装提示中粘贴。安装会保存密钥并配置开机启动。
     </p>
-    <el-alert v-if="!safeOrigin" title="请通过 HTTPS 访问控制台后安装或卸载客户端；HTTP 仅支持本机回环测试。" type="error" :closable="false" />
+    <el-alert
+      v-if="!safeOrigin"
+      title="请通过 HTTPS 访问控制台后安装或卸载客户端；HTTP 仅支持本机回环测试。"
+      type="error"
+      :closable="false"
+    />
     <div v-if="safeOrigin" class="download-row">
-      <el-input :model-value="props.token" type="password" show-password readonly autocomplete="off" aria-label="连接密钥" />
+      <el-input
+        :model-value="props.token"
+        type="password"
+        show-password
+        readonly
+        autocomplete="off"
+        aria-label="连接密钥"
+      />
       <el-button @click="copy(props.token, true)">复制连接密钥</el-button>
     </div>
     <el-radio-group v-model="platform">
@@ -90,6 +110,13 @@ async function copy(value = command.value, isKey = false) {
           : "使用管理员 PowerShell 执行；支持 Windows x64，自动创建启动任务。"
       }}
     </p>
+    <div v-if="platform === 'linux'" class="management-install-option">
+      <el-checkbox v-model="management">启用 v0.2 运维管理</el-checkbox>
+      <p class="small muted">
+        启用后客户端使用 root 执行白名单操作，支持
+        Docker、服务和文件管理。未勾选时仅监控。
+      </p>
+    </div>
     <div v-if="safeOrigin" class="code-block">
       <pre>{{ command }}</pre>
       <button
@@ -109,7 +136,9 @@ async function copy(value = command.value, isKey = false) {
         class="button-secondary"
         download
         ><Download :size="16" />{{
-          platform === "windows" ? "Windows x64 监控客户端" : "Linux amd64 监控客户端"
+          platform === "windows"
+            ? "Windows x64 监控客户端"
+            : "Linux amd64 监控客户端"
         }}</a
       >
       <a

@@ -22,3 +22,12 @@ for(const origin of ["https://monitor.example","http://127.0.0.1:5050","http://[
  }
 }
 console.log("INSTALL_COMMAND_SECURITY_OK: no key in commands; HTTPS/loopback only; install and uninstall.");
+
+const manageContext={URL,computed:fn=>({get value(){return fn();}}),ref:value=>({value}),defineProps:()=>({token:key}),location:{origin:"https://monitor.example"}};
+vm.createContext(manageContext);
+vm.runInContext(source+'\nglobalThis.initial=command.value;management.value=true;globalThis.enabled=command.value;platform.value="windows";globalThis.windows=command.value;',manageContext);
+assert.ok(!manageContext.initial.includes("--management"),"management unexpectedly enabled by default");
+assert.ok(manageContext.enabled.includes("--management"),"opt-in Linux management flag missing");
+assert.ok(!manageContext.enabled.includes(key),"key leaked into opted-in command");
+assert.ok(!manageContext.windows.includes("--management"),"Windows received unsupported management flag");
+console.log("MANAGEMENT_INSTALL_OPT_IN_OK: Linux explicit opt-in; Windows monitoring retained.");

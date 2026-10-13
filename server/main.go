@@ -74,7 +74,7 @@ func main() {
 	}()
 	server := &http.Server{Addr: cfg.Listen, Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	go func() {
-		log.Printf("CloudEase Lite v0.1 listening on %s", cfg.Listen)
+		log.Printf("CloudEase Lite v0.2 listening on %s", cfg.Listen)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP server: %v", err)
 			stop()

@@ -80,6 +80,7 @@ func (a *API) createServer(c *gin.Context) {
 		return
 	}
 	a.Hub.Broadcast("servers_changed")
+	c.Set("audit_server_id", s.ID)
 	c.JSON(201, gin.H{"server": a.view(s), "token": raw})
 }
 func (a *API) renameServer(c *gin.Context) {
@@ -137,6 +138,15 @@ func (a *API) deleteServer(c *gin.Context) {
 			return err
 		}
 		if err := tx.Where("server_id = ?", s.ID).Delete(&models.SystemLog{}).Error; err != nil {
+			return err
+		}
+		for _, model := range []any{&models.DockerContainer{}, &models.Service{}, &models.File{}, &models.ManagementTask{}} {
+			if err := tx.Where("server_id = ?", s.ID).Delete(model).Error; err != nil {
+				return err
+			}
+		}
+		// Preserve operation audit records when the monitored server is removed.
+		if err := tx.Model(&models.OperationLog{}).Where("server_id = ? AND status IN ?", s.ID, []string{"queued", "running"}).Updates(map[string]any{"status": "cancelled", "updated_at": time.Now().UTC()}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&s).Error

@@ -11,7 +11,7 @@ func cleanEnv(t *testing.T) {
 func TestSecureDefaults(t *testing.T) {
 	cleanEnv(t)
 	cfg, err := Load()
-	if err != nil || cfg.Listen != "127.0.0.1:8080" || !cfg.RequireReportFreshness || len(cfg.TrustedProxies) != 0 {
+	if err != nil || cfg.Listen != "127.0.0.1:8080" || !cfg.RequireReportFreshness || len(cfg.TrustedProxies) != 0 || cfg.RetentionDays != 30 {
 		t.Fatalf("defaults: %+v %v", cfg, err)
 	}
 	t.Setenv("PUBLIC_URL", "https://monitor.example/")

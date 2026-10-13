@@ -7,6 +7,7 @@ import (
 )
 
 type User struct {
+	Role      string    `gorm:"not null;default:admin;size:16" json:"role"`
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Username  string    `gorm:"uniqueIndex;size:64" json:"username"`
 	Password  string    `gorm:"not null" json:"-"`
@@ -19,21 +20,24 @@ type Session struct {
 	ExpiresAt time.Time `gorm:"index"`
 }
 type Server struct {
-	LastReportAt    int64      `json:"-"`
-	LastReportNonce string     `json:"-"`
-	ID              uint       `gorm:"primaryKey" json:"id"`
-	Name            string     `json:"name"`
-	Token           string     `gorm:"uniqueIndex;size:64" json:"-"`
-	IP              string     `json:"ip"`
-	Status          string     `gorm:"index" json:"status"`
-	OS              string     `json:"os"`
-	Platform        string     `json:"platform"`
-	PlatformVersion string     `json:"platform_version"`
-	Arch            string     `json:"arch"`
-	CPUCores        int        `json:"cpu_cores"`
-	Uptime          uint64     `json:"uptime"`
-	LastSeen        *time.Time `json:"last_seen"`
-	CreatedAt       time.Time  `json:"created_at"`
+	SystemJSON       string     `gorm:"type:text" json:"-"`
+	ManagementJSON   string     `gorm:"type:text" json:"-"`
+	ManagementSeenAt *time.Time `json:"management_seen_at,omitempty"`
+	LastReportAt     int64      `json:"-"`
+	LastReportNonce  string     `json:"-"`
+	ID               uint       `gorm:"primaryKey" json:"id"`
+	Name             string     `json:"name"`
+	Token            string     `gorm:"uniqueIndex;size:64" json:"-"`
+	IP               string     `json:"ip"`
+	Status           string     `gorm:"index" json:"status"`
+	OS               string     `json:"os"`
+	Platform         string     `json:"platform"`
+	PlatformVersion  string     `json:"platform_version"`
+	Arch             string     `json:"arch"`
+	CPUCores         int        `json:"cpu_cores"`
+	Uptime           uint64     `json:"uptime"`
+	LastSeen         *time.Time `json:"last_seen"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 type Metric struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`

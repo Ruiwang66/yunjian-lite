@@ -7,8 +7,10 @@ die() { echo "安装失败：$*" >&2; exit 1; }
 [ "$(uname -s)" = Linux ] || die "此脚本仅支持 Linux。"
 command -v systemctl >/dev/null && [ -d /run/systemd/system ] || die "需要正在运行的 systemd。"
 server= token= key_file=
+management=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --management) management=true; shift ;;
         --server) [ "$#" -ge 2 ] || die "--server 缺少地址"; server="$2"; shift 2 ;;
         --key-file) [ "$#" -ge 2 ] || die "缺少密钥文件"; key_file="$2"; shift 2 ;;
         --key|--token) [ "$#" -ge 2 ] || die "缺少连接密钥"; token="$2"; shift 2 ;;
@@ -115,6 +117,20 @@ MemoryMax=128M
 [Install]
 WantedBy=multi-user.target
 SERVICE
+if [ "$management" = true ]; then
+    # An explicit opt-in switches the client to root; no sudoers or Docker-group grant.
+    [ ! -L /opt/cloud-ease ] || die "运维文件目录不能是符号链接。"
+    if [ -e /opt/cloud-ease ]; then
+        [ -d /opt/cloud-ease ] && [ "$(stat -c %u /opt/cloud-ease)" -eq 0 ] || die "运维文件目录必须由 root 所有。"
+        mode=$(stat -c %a /opt/cloud-ease)
+        [ "$((8#$mode & 0022))" -eq 0 ] || die "运维文件目录不能允许其他用户写入。"
+    else
+        install -d -m 0750 -o root -g root /opt/cloud-ease
+    fi
+    sed -i -e 's/^User=cloudease-agent$/User=root/' -e 's/^Group=cloudease-agent$/Group=root/' \
+        -e 's|^ExecStart=.*|& --management|' -e '/^ProtectSystem=strict$/a ReadWritePaths=/opt/cloud-ease' "$work/cloud-agent.service"
+    echo "已明确启用运维管理：客户端使用 root，仅执行内置白名单操作。"
+fi
 if systemctl is-active --quiet cloud-agent; then systemctl stop cloud-agent; fi
 install -m 0755 "$work/cloud-agent" /opt/cloudease-lite/cloud-agent
 install -m 0640 -o root -g cloudease-agent "$work/agent-token" /etc/cloudease-lite/agent-token

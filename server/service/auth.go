@@ -68,7 +68,7 @@ func BootstrapAdmin(db *gorm.DB, dir string, reset bool) (bool, error) {
 				return err
 			}
 		} else {
-			if err := tx.Model(&user).Update("password", string(hash)).Error; err != nil {
+			if err := tx.Model(&user).Updates(map[string]any{"password": string(hash), "role": "admin"}).Error; err != nil {
 				return err
 			}
 		}
