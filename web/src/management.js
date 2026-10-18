@@ -17,7 +17,10 @@ export async function operation(path, params, method = "GET", signal) {
     },
   );
   if (!result.id || result.status !== "queued") return result;
-  const deadline = Date.now() + 50000;
+  const deadline = Math.min(
+    Date.now() + 125000,
+    Date.parse(result.expires_at) + 5000 || Date.now() + 50000,
+  );
   while (Date.now() < deadline) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     await new Promise((resolve) => setTimeout(resolve, 800));

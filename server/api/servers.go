@@ -3,6 +3,7 @@ package api
 import (
 	"cloudease-lite/server/models"
 	"cloudease-lite/server/service"
+	"cloudease-lite/shared"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"strconv"
@@ -65,8 +66,21 @@ func readName(c *gin.Context) (string, bool) {
 	return name, true
 }
 func (a *API) createServer(c *gin.Context) {
-	name, ok := readName(c)
-	if !ok {
+	var in struct {
+		Name        string `json:"name"`
+		CountryCode string `json:"country_code"`
+	}
+	if !decodeJSON(c, &in) {
+		return
+	}
+	name := strings.TrimSpace(in.Name)
+	code := strings.ToUpper(strings.TrimSpace(in.CountryCode))
+	if name == "" || len([]rune(name)) > 80 {
+		fail(c, 400, "服务器名称须为 1–80 个字符")
+		return
+	}
+	if !shared.ValidCountryCode(code) {
+		fail(c, 400, "请选择支持的国家或地区")
 		return
 	}
 	raw, err := service.RandomToken()
@@ -74,7 +88,7 @@ func (a *API) createServer(c *gin.Context) {
 		fail(c, 500, "生成连接密钥失败")
 		return
 	}
-	s := models.Server{Name: name, Token: service.HashToken(raw), Status: "pending"}
+	s := models.Server{Name: name, CountryCode: code, Token: service.HashToken(raw), Status: "pending"}
 	if a.DB.Create(&s).Error != nil {
 		dbError(c)
 		return
@@ -134,13 +148,16 @@ func (a *API) deleteServer(c *gin.Context) {
 		return
 	}
 	err := a.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.BackupTask{}).Where("server_id = ? AND status IN ?", s.ID, []string{"queued", "running"}).Updates(map[string]any{"status": "cancelled", "updated_at": time.Now().UTC()}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("server_id = ?", s.ID).Delete(&models.Metric{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("server_id = ?", s.ID).Delete(&models.SystemLog{}).Error; err != nil {
 			return err
 		}
-		for _, model := range []any{&models.DockerContainer{}, &models.Service{}, &models.File{}, &models.ManagementTask{}} {
+		for _, model := range []any{&models.DockerContainer{}, &models.Service{}, &models.File{}, &models.ManagementTask{}, &models.Website{}, &models.Domain{}, &models.SSLCertificate{}, &models.HealthCheck{}} {
 			if err := tx.Where("server_id = ?", s.ID).Delete(model).Error; err != nil {
 				return err
 			}

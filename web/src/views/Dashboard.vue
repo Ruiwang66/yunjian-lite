@@ -1,5 +1,12 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted, watch } from "vue";
+import {
+  computed,
+  ref,
+  onMounted,
+  onUnmounted,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import { useRoute } from "vue-router";
 import {
   Plus,
@@ -12,6 +19,7 @@ import {
   ArrowUp,
   Activity,
   Clock3,
+  Map,
 } from "lucide-vue-next";
 import { api, publicApi } from "../api";
 const props = defineProps({ publicView: Boolean });
@@ -20,12 +28,16 @@ import { revision } from "../state";
 import { ago, percent, bytes, statusText, date, eventMessage } from "../format";
 import MetricBar from "../components/MetricBar.vue";
 import AddServer from "../components/AddServer.vue";
+const ServerMap = defineAsyncComponent(
+  () => import("../components/ServerMap.vue"),
+);
 const route = useRoute(),
   servers = ref([]),
   logs = ref([]),
   loading = ref(true),
   error = ref(""),
   addOpen = ref(false),
+  mapOpen = ref(false),
   search = ref(""),
   filter = ref("all"),
   now = ref(Date.now()),
@@ -58,8 +70,11 @@ const visible = computed(() =>
         .includes(search.value.toLowerCase()),
   ),
 );
+const serverListView = computed(
+  () => !props.publicView && route.path === "/servers",
+);
 const title = computed(() =>
-  route.path === "/servers" ? "服务器" : "基础设施概览",
+  serverListView.value ? "服务器" : "基础设施概览",
 );
 let poll,
   clock,
@@ -70,7 +85,7 @@ async function refresh() {
   try {
     const [items, events] = await Promise.all([
       props.publicView ? publicApi.servers() : api.servers(),
-      props.publicView
+      props.publicView || serverListView.value
         ? Promise.resolve({ items: [] })
         : api.logs({ limit: 5 }),
     ]);
@@ -95,14 +110,35 @@ onUnmounted(() => {
   clearInterval(clock);
 });
 watch(revision, refresh);
+watch(serverListView, refresh);
 </script>
 <template>
   <div class="page-heading">
     <div>
-      <span class="eyebrow">INFRASTRUCTURE OVERVIEW</span>
+      <span class="eyebrow">{{
+        serverListView ? "SERVER MANAGEMENT" : "INFRASTRUCTURE OVERVIEW"
+      }}</span>
       <h1>{{ title }}</h1>
-      <p>关注关键指标，让每一台服务器保持最佳状态。</p>
+      <p>
+        {{
+          serverListView
+            ? "管理监控服务器，查看运行状态和资源使用情况。"
+            : "关注关键指标，让每一台服务器保持最佳状态。"
+        }}
+      </p>
     </div>
+    <button
+      v-if="publicView"
+      class="icon-button public-map-toggle"
+      :class="{ active: mapOpen }"
+      :aria-label="mapOpen ? '收起地图' : '展开地图'"
+      :title="mapOpen ? '收起地图' : '展开地图'"
+      :aria-expanded="mapOpen"
+      aria-controls="server-distribution-map"
+      @click="mapOpen = !mapOpen"
+    >
+      <Map :size="20" />
+    </button>
     <el-button
       v-if="!publicView && canOperate"
       type="primary"
@@ -119,7 +155,7 @@ watch(revision, refresh);
     show-icon
     class="page-error"
   />
-  <div class="stats-grid">
+  <div v-if="!serverListView" class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">服务器总数<Server :size="17" /></div>
       <div class="stat-value">{{ servers.length }}<span>台</span></div>
@@ -150,7 +186,18 @@ watch(revision, refresh);
       <div class="stat-note">在线服务器上下行总速率</div>
     </div>
   </div>
-  <section class="fleet-section">
+  <div
+    v-if="!serverListView && (!publicView || mapOpen)"
+    id="server-distribution-map"
+  >
+    <ServerMap
+      :servers="servers"
+      :public-view="publicView"
+      :editable="!publicView && canOperate"
+      @updated="refresh"
+    />
+  </div>
+  <section v-if="publicView || serverListView" class="fleet-section">
     <div class="section-heading">
       <div>
         <h2>
@@ -270,7 +317,7 @@ watch(revision, refresh);
       >
     </div>
   </section>
-  <section v-if="!publicView" class="events-panel">
+  <section v-if="!publicView && !serverListView" class="events-panel">
     <div class="section-heading">
       <div>
         <h2>最近活动</h2>

@@ -29,7 +29,7 @@ try:
         except (OSError,urllib.error.URLError):
             if time.monotonic()>deadline or proc.poll() is not None:raise RuntimeError("Isolated server failed to start")
             time.sleep(.1)
-    assert status==200 and result["version"]=="0.2.0"
+    assert status==200 and result["version"]=="0.3.0"
     first=(data/"admin-password.txt").read_text().split("password: ")[1].strip()
     status,headers,result=call("/api/auth/login",{"username":"admin","password":first})
     assert result["user"]["role"]=="admin"
@@ -56,7 +56,7 @@ try:
     status,headers,system=call("/api/system/info?server_id="+str(server_id))
     assert status==200 and system["system"]["cpu_model"] and system["system"]["kernel_version"],system
     status,headers,management=call("/api/management/info?server_id="+str(server_id))
-    assert status==200 and management["capabilities"]["version"]=="0.2.0"
+    assert status==200 and management["capabilities"]["version"]=="0.3.0"
     if os.name=="nt":assert management["capabilities"]["enabled"] is False
     # A loopback v0.1 control-plane fixture rejects extra fields just like decodeJSON.
     legacy_reports=[]
@@ -102,11 +102,11 @@ try:
         try:cadence.wait(timeout=8)
         except subprocess.TimeoutExpired:cadence.kill();cadence.wait(timeout=3)
         agent_log.close();cadence_key.unlink(missing_ok=True)
-    for route in ["/docker","/services","/files","/security","/system","/operations","/settings"]:
+    for route in ["/docker","/services","/files","/security","/system","/operations","/settings","/websites","/ssl"]:
         with urllib.request.urlopen(origin+route,timeout=5) as response:assert response.status==200 and b'id="app"' in response.read()
 
     (folder/"result.json").write_text(json.dumps({"status":"passed","scope":"isolated loopback release binaries","server_binary":str(server_path),"agent_binary":str(agent_path),"checks":["bootstrap and login","HttpOnly/SameSite","public HTTP rejected by client","Windows actual host collection and fresh report","public projection and history","authenticated binary SHA256","v0.2 role and actual system metadata","v0.2 client to v0.1 strict fixture","actual four-second cadence","new SPA route serving"]},indent=2),encoding="utf-8")
-    print("RELEASE_SMOKE_OK: v0.2 login, real collector/system details, four-second cadence, v0.1 compatibility, private/public APIs, SPA routes and checksums; no services installed.")
+    print("RELEASE_SMOKE_OK: v0.3 login, real collector/system details, four-second cadence, v0.1 compatibility, private/public APIs, website/SSL SPA routes and checksums; no services installed.")
 finally:
     proc.terminate()
     try:proc.wait(timeout=12)

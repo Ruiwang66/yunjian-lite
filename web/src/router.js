@@ -13,6 +13,8 @@ const Security = () => import("./views/Security.vue");
 const System = () => import("./views/System.vue");
 const Operations = () => import("./views/Operations.vue");
 const Settings = () => import("./views/Settings.vue");
+const Website = () => import("./views/Website.vue");
+const SSL = () => import("./views/SSL.vue");
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -30,6 +32,8 @@ const router = createRouter({
     { path: "/system", component: System },
     { path: "/operations", component: Operations },
     { path: "/settings", component: Settings },
+    { path: "/websites", component: Website },
+    { path: "/ssl", component: SSL },
     { path: "/:pathMatch(.*)*", redirect: "/" },
   ],
 });

@@ -120,3 +120,6 @@
 | vue-router | 4.6.4 | MIT |
 
 SQLite 本身为 public domain；其 Go 适配器及运行时转换代码按各自许可证分发。完整锁定版本以 go.sum 和 package-lock.json 为准。
+## 地图资源补充
+
+服务器分布地图使用 Natural Earth 公共领域地理数据，详见 [地图说明](docs/MAP.md)。生成阶段的 Robinson 正向投影改编自 d3-geo-projection（Copyright 2013–2021 Mike Bostock，ISC）；完整许可见 `web/src/components/world-map-license.txt`。运行时未引入额外地图 SDK。

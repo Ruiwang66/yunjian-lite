@@ -79,7 +79,7 @@ async function submit() {
           </div>
         </div>
         <div class="login-story-foot">
-          CLOUDEASE LITE <span>v0.2.0 / OPEN SOURCE</span>
+          CLOUDEASE LITE <span>v0.3.0 / OPEN SOURCE</span>
         </div>
       </section>
       <section class="login-panel">

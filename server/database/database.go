@@ -40,7 +40,7 @@ func Open(dir string) (*gorm.DB, error) {
 			return nil, err
 		}
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Server{}, &models.Metric{}, &models.SystemLog{}, &models.Role{}, &models.DockerContainer{}, &models.Service{}, &models.File{}, &models.OperationLog{}, &models.ManagementTask{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Server{}, &models.Metric{}, &models.SystemLog{}, &models.Role{}, &models.DockerContainer{}, &models.Service{}, &models.File{}, &models.OperationLog{}, &models.ManagementTask{}, &models.Website{}, &models.SSLCertificate{}, &models.Domain{}, &models.BackupTask{}, &models.HealthCheck{}); err != nil {
 		return nil, err
 	}
 	roles := []models.Role{{Name: "admin", Description: "全部权限及用户管理"}, {Name: "operator", Description: "管理服务器和白名单运维操作"}, {Name: "viewer", Description: "只读监控及运维数据"}}

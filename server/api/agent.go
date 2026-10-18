@@ -117,6 +117,25 @@ func (a *API) report(c *gin.Context) {
 			updates["system_json"] = string(raw)
 		}
 		if report.Management != nil {
+			if web := report.Management.Websites; web != nil && web.Enabled {
+				var websites []models.Website
+				if err := tx.Where("server_id = ?", s.ID).Find(&websites).Error; err != nil {
+					return err
+				}
+				for _, w := range websites {
+					for _, check := range web.Checks {
+						if check.Domain == w.Domain {
+							var old models.HealthCheck
+							tx.Where("website_id = ?", w.ID).First(&old)
+							if check.CheckedAt > old.UpdatedAt.UnixMilli() {
+								if err := cacheWebsiteCheck(tx, s, w, check, time.UnixMilli(check.CheckedAt).UTC()); err != nil {
+									return err
+								}
+							}
+						}
+					}
+				}
+			}
 			raw, _ := json.Marshal(report.Management)
 			updates["management_json"] = string(raw)
 			updates["management_seen_at"] = now

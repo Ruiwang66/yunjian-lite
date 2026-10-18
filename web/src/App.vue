@@ -16,6 +16,8 @@ import {
   Shield,
   Settings,
   Cpu,
+  Globe,
+  ShieldCheck,
 } from "lucide-vue-next";
 import { ElMessage } from "element-plus";
 import { api } from "./api";
@@ -111,14 +113,46 @@ onUnmounted(() => {
             >03</span
           ></router-link
         >
-        <router-link to="/docker"><Container :size="18" />Docker<span class="nav-short">04</span></router-link>
-        <router-link to="/services"><Cog :size="18" />服务管理<span class="nav-short">05</span></router-link>
-        <router-link to="/files"><Folder :size="18" />文件管理<span class="nav-short">06</span></router-link>
-        <router-link to="/security"
-          ><Shield :size="18" />命令与安全<span class="nav-short">07</span></router-link
+        <router-link to="/docker"
+          ><Container :size="18" />Docker<span class="nav-short"
+            >04</span
+          ></router-link
         >
-        <router-link to="/system"><Cpu :size="18" />系统信息<span class="nav-short">08</span></router-link>
-        <router-link to="/settings"><Settings :size="18" />设置<span class="nav-short">09</span></router-link>
+        <router-link to="/services"
+          ><Cog :size="18" />服务管理<span class="nav-short"
+            >05</span
+          ></router-link
+        >
+        <router-link to="/websites"
+          ><Globe :size="18" />网站管理<span class="nav-short"
+            >06</span
+          ></router-link
+        >
+        <router-link to="/ssl"
+          ><ShieldCheck :size="18" />SSL 证书<span class="nav-short"
+            >07</span
+          ></router-link
+        >
+        <router-link to="/files"
+          ><Folder :size="18" />文件管理<span class="nav-short"
+            >08</span
+          ></router-link
+        >
+        <router-link to="/security"
+          ><Shield :size="18" />命令与安全<span class="nav-short"
+            >09</span
+          ></router-link
+        >
+        <router-link to="/system"
+          ><Cpu :size="18" />系统信息<span class="nav-short"
+            >10</span
+          ></router-link
+        >
+        <router-link to="/settings"
+          ><Settings :size="18" />设置<span class="nav-short"
+            >11</span
+          ></router-link
+        >
       </nav>
       <div class="sidebar-foot">
         <div class="release-card">
@@ -127,7 +161,7 @@ onUnmounted(() => {
           >
         </div>
         <div class="version-row">
-          <span>v0.2.0</span><span>开源 / MIT</span>
+          <span>v0.3.0</span><span>开源 / MIT</span>
         </div>
       </div>
     </aside>
@@ -146,6 +180,8 @@ onUnmounted(() => {
               "/security": "命令与安全",
               "/system": "系统信息",
               "/settings": "设置",
+              "/websites": "网站管理",
+              "/ssl": "SSL 证书",
             }[route.path] || "服务器"
           }}</span
         >

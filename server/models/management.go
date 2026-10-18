@@ -49,6 +49,7 @@ type OperationLog struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 type ManagementTask struct {
+	WebsiteID      uint      `gorm:"index" json:"website_id,omitempty"`
 	ID             string    `gorm:"primaryKey;size:43" json:"id"`
 	ServerID       uint      `gorm:"index" json:"server_id"`
 	UserID         uint      `json:"-"`

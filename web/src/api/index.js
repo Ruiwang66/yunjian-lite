@@ -28,14 +28,22 @@ export const api = {
     request("/auth/password", { method: "POST", body: JSON.stringify(data) }),
   servers: () => request("/servers"),
   server: (id) => request(`/servers/${id}`),
-  create: (name) =>
-    request("/servers", { method: "POST", body: JSON.stringify({ name }) }),
+  create: (name, country_code = "") =>
+    request("/servers", {
+      method: "POST",
+      body: JSON.stringify({ name, country_code }),
+    }),
   rename: (id, name) =>
     request(`/servers/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ name }),
     }),
   uninstall: (id) => request(`/servers/${id}/uninstall`),
+  location: (id, country_code) =>
+    request(`/servers/${id}/location`, {
+      method: "PATCH",
+      body: JSON.stringify({ country_code }),
+    }),
   remove: (id) => request(`/servers/${id}`, { method: "DELETE" }),
   token: (id) => request(`/servers/${id}/token`, { method: "POST" }),
   history: (id, hours) => request(`/servers/${id}/metrics?hours=${hours}`),

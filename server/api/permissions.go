@@ -23,7 +23,7 @@ func (a *API) permissions(c *gin.Context) {
 }
 func (a *API) audit(c *gin.Context) {
 	path := c.Request.URL.Path
-	tracked := c.Request.Method != "GET" || strings.HasPrefix(path, "/api/users") || path == "/api/roles" || strings.HasPrefix(path, "/api/docker/") || strings.HasPrefix(path, "/api/service/") || strings.HasPrefix(path, "/api/files/") || path == "/api/system/info"
+	tracked := c.Request.Method != "GET" || strings.HasPrefix(path, "/api/users") || path == "/api/roles" || strings.HasPrefix(path, "/api/docker/") || strings.HasPrefix(path, "/api/service/") || strings.HasPrefix(path, "/api/files/") || path == "/api/system/info" || strings.HasPrefix(path, "/api/websites") || strings.HasPrefix(path, "/api/nginx") || strings.HasPrefix(path, "/api/ssl") || strings.HasPrefix(path, "/api/domain") || strings.HasPrefix(path, "/api/backup") || strings.HasPrefix(path, "/api/php")
 	if !tracked {
 		c.Next()
 		return

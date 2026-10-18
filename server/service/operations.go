@@ -13,6 +13,9 @@ func ExpireOperations(db *gorm.DB, now time.Time) error {
 			return err
 		}
 		for _, task := range tasks {
+			if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "expired", "updated_at": now}).Error; err != nil {
+				return err
+			}
 			if err := tx.Model(&task).Updates(map[string]any{"status": "expired", "request_json": "", "updated_at": now}).Error; err != nil {
 				return err
 			}
@@ -21,6 +24,9 @@ func ExpireOperations(db *gorm.DB, now time.Time) error {
 			}
 		}
 		// Results are available for five minutes. Completed tasks are removed after a day.
+		if err := tx.Model(&models.BackupTask{}).Where("status IN ? AND task_id IN (?)", []string{"queued", "running"}, tx.Model(&models.ManagementTask{}).Select("id").Where("status IN ?", []string{"running", "success", "failed", "cancelled", "expired"})).Updates(map[string]any{"status": gorm.Expr("(SELECT status FROM management_tasks WHERE management_tasks.id = backup_tasks.task_id)"), "updated_at": now}).Error; err != nil {
+			return err
+		}
 		if err := tx.Model(&models.ManagementTask{}).Where("updated_at < ?", now.Add(-5*time.Minute)).Updates(map[string]any{"request_json": "", "result_json": ""}).Error; err != nil {
 			return err
 		}

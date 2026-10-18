@@ -88,6 +88,9 @@ func operatorAction(action string) bool {
 	return shared.MutatingAction(action) || strings.HasPrefix(action, "command.")
 }
 func validManagementRequest(req shared.ManagementRequest) bool {
+	if req.Website != nil || shared.WebsiteAction(req.Action) {
+		return false
+	} // Website routes bind targets to a persisted, host-authorized site.
 	if !shared.KnownAction(req.Action) || req.Root < 0 || req.Root > 7 || req.Action != "file.upload" && req.Content != "" {
 		return false
 	}
@@ -291,6 +294,9 @@ func (a *API) nextOperation(c *gin.Context) {
 			if err := tx.Model(&task).Updates(map[string]any{"status": "cancelled", "request_json": "", "updated_at": now}).Error; err != nil {
 				return err
 			}
+			if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error; err != nil {
+				return err
+			}
 			return tx.Model(&models.OperationLog{}).Where("id = ?", task.OperationLogID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error
 		}
 		lease, err := service.RandomToken()
@@ -370,6 +376,11 @@ func (a *API) operationResult(c *gin.Context) {
 		if err := tx.Model(&task).Updates(map[string]any{"status": status, "request_json": "", "result_json": string(raw), "updated_at": now}).Error; err != nil {
 			return err
 		}
+		if strings.HasPrefix(task.Action, "backup.") {
+			if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": status, "updated_at": now}).Error; err != nil {
+				return err
+			}
+		}
 		return tx.Model(&models.OperationLog{}).Where("id = ?", task.OperationLogID).Updates(map[string]any{"status": status, "updated_at": now}).Error
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -387,6 +398,9 @@ func (a *API) operationResult(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 func cacheResult(tx *gorm.DB, task models.ManagementTask, data json.RawMessage, now time.Time) error {
+	if shared.WebsiteAction(task.Action) {
+		return cacheWebsiteResult(tx, task, data, now)
+	}
 	switch task.Action {
 	case "docker.list":
 		var items []shared.Container
@@ -493,6 +507,27 @@ func validExtensions(r shared.Report) bool {
 	}
 	if r.Management != nil {
 		m := r.Management
+		if m.Websites != nil {
+			w := m.Websites
+			if len(w.Sites) > 20 || len(w.Checks) > 20 || len(w.Nginx.Version) > 256 || len(w.Nginx.State) > 64 || len(w.PHP.Version) > 256 || len(w.PHP.FPMState) > 128 || len(w.PHP.Extensions) > 64 || len(w.PHP.Warnings) > 20 {
+				return false
+			}
+			for _, s := range w.Sites {
+				if !shared.ValidWebsite(s) {
+					return false
+				}
+			}
+			for _, check := range w.Checks {
+				if !validWebsiteCheck(check) {
+					return false
+				}
+			}
+			for _, s := range append(append([]string{}, w.PHP.Extensions...), w.PHP.Warnings...) {
+				if len(s) > 512 {
+					return false
+				}
+			}
+		}
 		if len(m.Version) > 32 || len(m.FileRoots) > 8 || len(m.Services) > 200 || len(m.Docker.Version) > 128 || m.Docker.Containers < 0 || m.Docker.Images < 0 {
 			return false
 		}

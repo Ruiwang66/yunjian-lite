@@ -48,6 +48,7 @@ func main() {
 	manage := flag.Bool("management", false, "Enable Linux management with local allowlists (off by default)")
 	roots := flag.String("file-roots", env("CLOUDEASE_FILE_ROOTS", ""), "Comma-separated allowed file roots")
 	services := flag.String("allowed-services", env("CLOUDEASE_ALLOWED_SERVICES", ""), "Comma-separated systemd allowlist")
+	websiteConfig := flag.String("website-config", env("CLOUDEASE_WEBSITE_CONFIG", ""), "Root-owned JSON allowlist for website management (off by default)")
 	flag.Parse()
 	if *tokenFile != "" {
 		data, err := privatefs.ReadSecret(*tokenFile)
@@ -75,6 +76,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err = manager.ConfigureWebsites(*websiteConfig); err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("Client startup: OS=%s %s", runtime.GOOS, manager)
 	var worker sync.WaitGroup
 	if *manage && runtime.GOOS == "linux" && !*once {
@@ -92,6 +96,11 @@ func main() {
 		snapshotCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 		next := manager.Snapshot(snapshotCtx)
 		cancel()
+		if supportsWebsites(ctx, client, u.String(), *token) {
+			websiteCtx, websiteCancel := context.WithTimeout(ctx, 8*time.Second)
+			next.Websites = manager.WebsiteSnapshot(websiteCtx)
+			websiteCancel()
+		}
 		system := collector.Details()
 		snapshotMu.Lock()
 		snapshot, details, extensions = next, system, enabled
@@ -141,6 +150,25 @@ func main() {
 		data, err := json.Marshal(report)
 		if err != nil {
 			return err
+		}
+		// Large optional lists must never interrupt the four-second base metrics.
+		if len(data) > 60*1024 && report.Management != nil {
+			copyInfo := *report.Management
+			copyInfo.Services = nil
+			if copyInfo.Websites != nil {
+				copyWeb := *copyInfo.Websites
+				copyWeb.Checks = nil
+				copyInfo.Websites = &copyWeb
+			}
+			report.Management = &copyInfo
+			data, err = json.Marshal(report)
+			if len(data) > 60*1024 {
+				report.Management = nil
+				data, err = json.Marshal(report)
+			}
+			if err != nil {
+				return err
+			}
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(data))
 		if err != nil {

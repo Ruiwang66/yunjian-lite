@@ -8,15 +8,33 @@ die() { echo "安装失败：$*" >&2; exit 1; }
 command -v systemctl >/dev/null && [ -d /run/systemd/system ] || die "需要正在运行的 systemd。"
 server= token= key_file=
 management=false
+container_monitor=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --management) management=true; shift ;;
+        --container-monitor) container_monitor=true; shift ;;
         --server) [ "$#" -ge 2 ] || die "--server 缺少地址"; server="$2"; shift 2 ;;
         --key-file) [ "$#" -ge 2 ] || die "缺少密钥文件"; key_file="$2"; shift 2 ;;
         --key|--token) [ "$#" -ge 2 ] || die "缺少连接密钥"; token="$2"; shift 2 ;;
         *) die "未知参数：$1" ;;
     esac
 done
+if [ "$container_monitor" = true ]; then
+    [ "$management" = false ] || die "--container-monitor 仅支持监控，不能同时启用 --management。"
+    command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet || die "容器兼容模式仅用于 systemd 能识别的容器。"
+    # A missing service is expected on first installation; other inspection errors are not.
+    unit_info=$(systemctl show cloud-agent.service -p LoadState -p DropInPaths 2>/dev/null) || {
+        [[ "$unit_info" == *'LoadState=not-found'* ]] || die "无法检查现有服务覆盖配置，原有安装未修改。"
+    }
+    drop_ins=$(printf '%s\n' "$unit_info" | sed -n 's/^DropInPaths=//p')
+    [ -z "$drop_ins" ] || die "存在 systemd drop-in：$drop_ins。请先检查并备份冲突配置；脚本不会自动删除覆盖配置。"
+    for dir in /etc/systemd/system/cloud-agent.service.d /run/systemd/system/cloud-agent.service.d /usr/lib/systemd/system/cloud-agent.service.d /lib/systemd/system/cloud-agent.service.d; do
+        for file in "$dir"/*.conf; do
+            [ ! -e "$file" ] || die "存在服务覆盖配置：$file。请先检查并备份冲突配置，原有安装未修改。"
+        done
+    done
+    echo "明确选择容器仅监控：保留普通账户、空能力集和 128 MB 服务内存限制，停用客户端服务中不适用的隔离项。外层容器权限不变。"
+fi
 server_pattern='^https?://([a-zA-Z0-9.-]+|\[[0-9a-fA-F:]+\])(:[0-9]+)?/?$'
 [[ "$server" =~ $server_pattern ]] || die "控制台地址须为 http(s)://域名或IP，可包含端口。"
 server="${server%/}"
@@ -117,6 +135,15 @@ MemoryMax=128M
 [Install]
 WantedBy=multi-user.target
 SERVICE
+if [ "$container_monitor" = true ]; then
+    # Explicit opt-in only: these directives can require mount namespaces or seccomp.
+    # Keep NoNewPrivileges, an empty capability set and MemoryMax; never grant CAP_SYS_ADMIN.
+    sed -i -e '/^ProtectSystem=/d' -e '/^ProtectHome=/d' -e '/^PrivateTmp=/d' \
+        -e '/^PrivateDevices=/d' -e '/^ProtectKernelTunables=/d' -e '/^ProtectKernelModules=/d' \
+        -e '/^ProtectControlGroups=/d' -e '/^RestrictSUIDSGID=/d' \
+        -e '/^NoNewPrivileges=true$/a UMask=0077' \
+        -e 's|^ExecStart=.*|& --website-config=|' "$work/cloud-agent.service"
+fi
 if [ "$management" = true ]; then
     # An explicit opt-in switches the client to root; no sudoers or Docker-group grant.
     [ ! -L /opt/cloud-ease ] || die "运维文件目录不能是符号链接。"
@@ -130,6 +157,10 @@ if [ "$management" = true ]; then
     sed -i -e 's/^User=cloudease-agent$/User=root/' -e 's/^Group=cloudease-agent$/Group=root/' \
         -e 's|^ExecStart=.*|& --management|' -e '/^ProtectSystem=strict$/a ReadWritePaths=/opt/cloud-ease' "$work/cloud-agent.service"
     echo "已明确启用运维管理：客户端使用 root，仅执行内置白名单操作。"
+    if [ -f /etc/cloudease-lite/websites.json ] && [ ! -L /etc/cloudease-lite/websites.json ]; then
+        printf 'CLOUDEASE_WEBSITE_CONFIG=/etc/cloudease-lite/websites.json\n' >> "$work/agent.env"
+        echo "检测到主机网站白名单，将由 v0.3 客户端校验后启用。自定义写入目录请保留 systemd drop-in 配置。"
+    fi
 fi
 if systemctl is-active --quiet cloud-agent; then systemctl stop cloud-agent; fi
 install -m 0755 "$work/cloud-agent" /opt/cloudease-lite/cloud-agent

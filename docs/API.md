@@ -1,4 +1,27 @@
-# v0.2 API 协议（保留 v0.1 接口）
+# v0.3 API 协议（保留 v0.1 / v0.2 接口）
+
+## v0.3 网站接口
+
+以下接口都要求已认证的会话、角色验证和运维审计。`server_id` 指定服务器；站点操作使用 `website_id`，服务端绑定数据库网站和主机上报白名单，客户端再次校验。viewer 可读，POST/PATCH/DELETE 需要 admin/operator。
+
+| 方法 | 路径 | 功能 |
+| --- | --- | --- |
+| GET / POST | `/api/websites` | 网站列表及创建登记 |
+| GET / PATCH / DELETE | `/api/websites/:id` | 网站详情、编辑、删除控制台记录 |
+| POST | `/api/websites/:id/check` | 健康、DNS 与 SSL 即时检查 |
+| GET | `/api/nginx/status` | 已采集 Nginx 状态 |
+| GET | `/api/nginx/sites` | 实时授权站点启用状态（异步） |
+| GET | `/api/nginx/site/config` | 授权站点配置读取（异步） |
+| POST | `/api/nginx/site/enable`、`disable` | 自动备份、配置检查、重载或失败回滚 |
+| GET / POST | `/api/php/info`、`/api/php/inspect` | 缓存 PHP 信息、主动检测 |
+| GET / POST | `/api/ssl`、`/api/ssl/check` | 证书记录、主动检测 |
+| GET / POST | `/api/domain`、`/api/domain/check` | DNS 记录、主动检测 |
+| GET / POST | `/api/backup` | 备份记录、手动执行（`kind=files/database`） |
+| GET | `/api/backup/schedule` | 自动备份预留，当前返回 `enabled=false` |
+
+异步站点操作继续返回 202 与任务编号，按 `/api/operations/:task` 读取结果。普通任务 45 秒，备份任务 120 秒到期；不自动重试。创建网站 JSON 为 `name/domain/root_path/server_id/nginx_config`；目录和配置必须与客户端白名单一致，不接受配置文本。客户端认证检查新增 `website_protocol:1`，新管理上报可选 `websites`，旧版协商时不发送此字段。完整边界见 [v0.3 指南](V0.3.md)。
+
+## 保留的基础接口与 v0.2 接口
 
 所有 JSON API 位于 `/api`；错误为 `{ "error": "..." }`。标准状态码 400/401/403/404/409/413/415/421/429/500。请求体最多 64 KiB；JSON 必须使用 application/json，拒绝未知字段和尾随值。没有 CORS 开放接口。通过同源 Cookie 登录控制台；监控客户端 通过独立 Bearer 连接密钥 上报。
 
@@ -86,6 +109,8 @@ PUBLIC_URL 固定管理页面和接口 Host、写请求 Origin 和 WebSocket Ori
 
 
 ## v0.2 管理接口
+
+地图地区接口：`PATCH /api/servers/:id/location`，请求 `{country_code:"CN"}`；支持地图中的国家或地区代码，空字符串清除地区。需要 admin / operator 登录，沿用来源检查与审计。添加服务器也可选传 `country_code`，公开服务器接口仅增加此地区代码，不公开 IP。
 
 除登录、原有公开监控、healthz 与静态安装脚本外，管理接口全部要求 HttpOnly 会话；客户端管理接口只接受 Bearer 连接密钥，浏览器会话不能替代。所有 API 与 UI 同源，沿用来源验证和 64 KiB 请求上限。
 

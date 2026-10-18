@@ -27,3 +27,21 @@ func TestAuthenticatedVersionNegotiation(t *testing.T) {
 		}
 	}
 }
+func TestWebsiteProtocolNegotiation(t *testing.T) {
+	for _, tc := range []struct {
+		body     string
+		expected bool
+	}{{`{"management_protocol":1}`, false}, {`{"website_protocol":1}`, true}, {`{"website_protocol":2}`, false}} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") != "Bearer test-key" {
+				t.Error("unauthenticated website protocol")
+			}
+			w.Write([]byte(tc.body))
+		}))
+		got := supportsWebsites(context.Background(), server.Client(), server.URL, "test-key")
+		server.Close()
+		if got != tc.expected {
+			t.Fatal(tc.body, got)
+		}
+	}
+}

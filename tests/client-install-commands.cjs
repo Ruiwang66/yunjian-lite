@@ -31,3 +31,27 @@ assert.ok(manageContext.enabled.includes("--management"),"opt-in Linux managemen
 assert.ok(!manageContext.enabled.includes(key),"key leaked into opted-in command");
 assert.ok(!manageContext.windows.includes("--management"),"Windows received unsupported management flag");
 console.log("MANAGEMENT_INSTALL_OPT_IN_OK: Linux explicit opt-in; Windows monitoring retained.");
+
+const containerContext={URL,computed:fn=>({get value(){return fn();}}),ref:value=>({value}),defineProps:()=>({token:key}),location:{origin:"https://monitor.example"}};
+vm.createContext(containerContext);
+vm.runInContext(source+`
+globalThis.initial=command.value;
+management.value=true;
+containerMonitor.value=true;selectContainerMonitor(true);
+globalThis.containerCommand=command.value;
+globalThis.managementCleared=!management.value;
+management.value=true;selectManagement(true);
+globalThis.managementCommand=command.value;
+globalThis.containerCleared=!containerMonitor.value;
+containerMonitor.value=true;selectContainerMonitor(true);
+platform.value="windows";globalThis.windows=command.value;
+`,containerContext);
+assert.ok(!containerContext.initial.includes("--container-monitor"),"container compatibility unexpectedly enabled by default");
+assert.ok(containerContext.managementCleared,"container choice must clear management");
+assert.ok(containerContext.containerCommand.includes("--container-monitor"),"container compatibility flag missing");
+assert.ok(!containerContext.containerCommand.includes("--management"),"container command enabled management");
+assert.ok(!containerContext.containerCommand.includes(key),"key leaked into container command");
+assert.ok(containerContext.containerCleared,"management choice must clear container compatibility");
+assert.ok(containerContext.managementCommand.includes("--management")&&!containerContext.managementCommand.includes("--container-monitor"));
+assert.ok(!containerContext.windows.includes("--container-monitor")&&!containerContext.windows.includes("--management"),"Windows received Linux-only flags");
+console.log("CONTAINER_MONITOR_INSTALL_OPT_IN_OK: Linux explicit choice; modes exclusive; no key in command.");

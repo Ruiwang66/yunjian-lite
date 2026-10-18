@@ -84,7 +84,7 @@ func (a *API) Router() *gin.Engine {
 	agentInstall.GET("/operations/next", a.nextOperation)
 	agentInstall.POST("/operations/result", a.operationResult)
 	agentInstall.GET("/check", func(c *gin.Context) {
-		c.JSON(200, gin.H{"ok": true, "version": shared.Version, "management_protocol": 1})
+		c.JSON(200, gin.H{"ok": true, "version": shared.Version, "management_protocol": 1, "website_protocol": 1})
 	})
 	agentInstall.GET("/downloads/:file", a.downloadAgent)
 	agentInstall.GET("/downloads/:file/sha256", a.downloadChecksum)
@@ -97,6 +97,7 @@ func (a *API) Router() *gin.Engine {
 	private := r.Group("/api")
 	private.Use(a.auth, a.audit, a.permissions)
 	a.managementRoutes(private)
+	a.websiteRoutes(private)
 	private.GET("/auth/me", a.me)
 	private.POST("/auth/logout", a.logout)
 	private.POST("/auth/password", a.password)
@@ -104,6 +105,7 @@ func (a *API) Router() *gin.Engine {
 	private.POST("/servers", a.createServer)
 	private.GET("/servers/:id", a.server)
 	private.PATCH("/servers/:id", a.renameServer)
+	private.PATCH("/servers/:id/location", a.updateLocation)
 	private.DELETE("/servers/:id", a.deleteServer)
 	private.GET("/servers/:id/uninstall", a.uninstallInfo)
 	private.POST("/servers/:id/token", a.rotateToken)
@@ -120,7 +122,7 @@ func (a *API) Router() *gin.Engine {
 	private.GET("/downloads/:file/sha256", a.downloadChecksum)
 	r.Static("/assets", filepath.Join(a.Config.WebDir, "assets"))
 	r.NoRoute(func(c *gin.Context) {
-		if c.Request.Method != "GET" || strings.HasPrefix(c.Request.URL.Path, "/api") {
+		if c.Request.Method != "GET" || strings.HasPrefix(c.Request.URL.Path, "/api") || strings.HasPrefix(c.Request.URL.Path, "/assets/") {
 			fail(c, 404, "接口不存在")
 			return
 		}

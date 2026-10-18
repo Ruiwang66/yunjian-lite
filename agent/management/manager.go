@@ -22,6 +22,7 @@ import (
 
 type Runner func(context.Context, string, ...string) ([]byte, error)
 type Manager struct {
+	websites   *websiteManager
 	Enabled    bool
 	Roots      []string
 	Services   map[string]bool
@@ -119,6 +120,21 @@ func (m *Manager) Execute(ctx context.Context, req shared.ManagementRequest) (an
 	}
 	if !shared.KnownAction(req.Action) || req.Root < 0 || req.Root >= len(m.Roots) {
 		return nil, errors.New("操作或目录编号不允许")
+	}
+	if shared.WebsiteAction(req.Action) {
+		if req.Path != "" || req.Content != "" || req.Root != 0 {
+			return nil, errors.New("网站操作不允许额外参数")
+		}
+		limit := 12 * time.Second
+		if strings.HasPrefix(req.Action, "backup.") {
+			limit = 90 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(ctx, limit)
+		defer cancel()
+		return m.websiteOperation(ctx, req)
+	}
+	if req.Website != nil {
+		return nil, errors.New("此操作不允许网站参数")
 	}
 	if !strings.HasPrefix(req.Action, "file.") && (req.Path != "" || req.Content != "" || req.Root != 0) {
 		return nil, errors.New("此操作不允许额外文件参数")

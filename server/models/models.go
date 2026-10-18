@@ -20,6 +20,7 @@ type Session struct {
 	ExpiresAt time.Time `gorm:"index"`
 }
 type Server struct {
+	CountryCode      string     `gorm:"size:2;not null;default:''" json:"country_code"`
 	SystemJSON       string     `gorm:"type:text" json:"-"`
 	ManagementJSON   string     `gorm:"type:text" json:"-"`
 	ManagementSeenAt *time.Time `json:"management_seen_at,omitempty"`

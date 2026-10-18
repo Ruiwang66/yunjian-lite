@@ -44,10 +44,13 @@ func TestV01MigrationPreservesUsersServersSessions(t *testing.T) {
 		if db.First(&s, 1).Error != nil || s.Name != "existing-server" || s.Token != "existing-key-hash" {
 			t.Fatalf("server migration: %+v", s)
 		}
+		if s.CountryCode != "" {
+			t.Fatal("migration invented a location for existing server")
+		}
 		if db.First(&session, 1).Error != nil || session.TokenHash != "existing-session-hash" {
 			t.Fatal("session lost")
 		}
-		for _, table := range []string{"roles", "operation_logs", "docker_containers", "services", "files", "management_tasks"} {
+		for _, table := range []string{"roles", "operation_logs", "docker_containers", "services", "files", "management_tasks", "websites", "ssl_certificates", "domains", "backup_tasks", "health_checks"} {
 			if !db.Migrator().HasTable(table) {
 				t.Fatalf("missing table %s", table)
 			}

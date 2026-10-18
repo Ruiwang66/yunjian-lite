@@ -2,17 +2,19 @@
 import { ref } from "vue";
 import { ElMessage } from "element-plus";
 import TokenSetup from "./TokenSetup.vue";
+import CountrySelect from "./CountrySelect.vue";
 import { api } from "../api";
 const open = defineModel({ type: Boolean }),
   emit = defineEmits(["created"]);
 const name = ref(""),
+  country = ref(""),
   token = ref(""),
   loading = ref(false);
 async function submit() {
   if (!name.value.trim()) return ElMessage.info("请输入服务器名称");
   loading.value = true;
   try {
-    const result = await api.create(name.value.trim());
+    const result = await api.create(name.value.trim(), country.value);
     token.value = result.token;
     emit("created");
     ElMessage.success("服务器已创建");
@@ -24,6 +26,7 @@ async function submit() {
 }
 function reset() {
   name.value = "";
+  country.value = "";
   token.value = "";
 }
 </script>
@@ -44,6 +47,8 @@ function reset() {
           placeholder="例如：Debian 生产服务器"
           maxlength="80"
           autofocus /></el-form-item
+      ><el-form-item label="国家或地区（可稍后设置）"
+        ><CountrySelect v-model="country" /></el-form-item
       ><el-button type="primary" :loading="loading" native-type="submit"
         >创建并获取连接密钥</el-button
       ></el-form

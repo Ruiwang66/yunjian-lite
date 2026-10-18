@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 const MaxFileBytes = 32 * 1024
 const MaxOutputBytes = 16 * 1024
 
@@ -37,24 +37,26 @@ type Service struct {
 	Allowed bool   `json:"allowed"`
 }
 type ManagementInfo struct {
-	Version      string     `json:"version"`
-	Enabled      bool       `json:"enabled"`
-	Privileged   bool       `json:"privileged"`
-	DockerWrite  bool       `json:"docker_write"`
-	ServiceWrite bool       `json:"service_write"`
-	FileWrite    bool       `json:"file_write"`
-	FileRoots    []string   `json:"file_roots"`
-	Docker       DockerInfo `json:"docker"`
-	Services     []Service  `json:"services"`
+	Websites     *WebsiteInventory `json:"websites,omitempty"`
+	Version      string            `json:"version"`
+	Enabled      bool              `json:"enabled"`
+	Privileged   bool              `json:"privileged"`
+	DockerWrite  bool              `json:"docker_write"`
+	ServiceWrite bool              `json:"service_write"`
+	FileWrite    bool              `json:"file_write"`
+	FileRoots    []string          `json:"file_roots"`
+	Docker       DockerInfo        `json:"docker"`
+	Services     []Service         `json:"services"`
 }
 
 // Only typed, fixed actions cross the control plane; there is no shell or argv field.
 type ManagementRequest struct {
-	Action  string `json:"action"`
-	Target  string `json:"target,omitempty"`
-	Root    int    `json:"root,omitempty"`
-	Path    string `json:"path,omitempty"`
-	Content string `json:"content,omitempty"` // base64, bounded to 32 KiB after decoding
+	Website *WebsiteSpec `json:"website,omitempty"`
+	Action  string       `json:"action"`
+	Target  string       `json:"target,omitempty"`
+	Root    int          `json:"root,omitempty"`
+	Path    string       `json:"path,omitempty"`
+	Content string       `json:"content,omitempty"` // base64, bounded to 32 KiB after decoding
 }
 type ManagementTask struct {
 	ID        string            `json:"id"`
@@ -78,12 +80,17 @@ type FileEntry struct {
 
 func MutatingAction(action string) bool {
 	switch action {
+	case "nginx.enable", "nginx.disable", "backup.files", "backup.database":
+		return true
 	case "docker.start", "docker.stop", "docker.restart", "service.start", "service.stop", "service.restart", "file.upload":
 		return true
 	}
 	return false
 }
 func KnownAction(action string) bool {
+	if WebsiteAction(action) {
+		return true
+	}
 	switch action {
 	case "docker.info", "docker.list", "docker.logs", "docker.start", "docker.stop", "docker.restart", "service.list", "service.start", "service.stop", "service.restart", "file.list", "file.read", "file.download", "file.upload", "command.disk", "command.memory", "command.network", "command.journal":
 		return true

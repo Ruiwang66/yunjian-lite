@@ -9,7 +9,7 @@ defineProps({
 <template>
   <div class="page-heading">
     <div>
-      <span class="eyebrow">CLOUDEASE / V0.2</span>
+      <span class="eyebrow">CLOUDEASE / V0.3</span>
       <h1>{{ title }}</h1>
       <p>{{ description }}</p>
     </div>

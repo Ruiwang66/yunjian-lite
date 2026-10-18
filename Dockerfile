@@ -20,7 +20,7 @@ FROM scratch
 WORKDIR /app
 COPY --from=go /out/cloud-server ./cloud-server
 COPY --from=go /out/downloads ./downloads
-COPY --from=web /src/web/dist ./web/dist
+COPY --chmod=0755 --from=web /src/web/dist ./web/dist
 COPY --chown=10001:10001 deploy/data/ /app/data/
 USER 10001:10001
 ENV DATA_DIR=/app/data WEB_DIR=/app/web/dist LISTEN_ADDR=:8080

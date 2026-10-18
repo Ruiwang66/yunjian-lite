@@ -65,7 +65,7 @@ func TestAgentInstallerDownloadAuthorization(t *testing.T) {
 	if w := call("/api/downloads/cloud-agent-linux-amd64", "Bearer fixture-token"); w.Code != 401 {
 		t.Fatal("Agent token must not grant administrator access")
 	}
-	for path, marker := range map[string]string{"/install-client.sh": "cloud-agent-linux-arm64", "/install-client.ps1": "Register-ScheduledTask", "/install-agent.sh": "cloud-agent-linux-arm64", "/install-agent.ps1": "Register-ScheduledTask"} {
+	for path, marker := range map[string]string{"/install-client.sh": "--container-monitor", "/install-client.ps1": "Register-ScheduledTask", "/install-agent.sh": "--container-monitor", "/install-agent.ps1": "Register-ScheduledTask"} {
 		w := call(path, "")
 		if w.Code != 200 || !strings.Contains(w.Body.String(), marker) || w.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("missing installer: %s", path)

@@ -61,6 +61,45 @@ journalctl -u cloud-agent -n 30 --no-pager
 
 CentOS 如无 `/usr/sbin/nologin`，使用 `/sbin/nologin`。如启用 SELinux，须按实际策略允许执行安装路径；不要为此关闭 SELinux。二进制为静态 Go 程序，无需 glibc。
 
+## NAT / Podman / LXC 容器仅监控
+
+后台「添加服务器」或「更新监控客户端连接」弹窗中，选择 Linux 自动安装，勾选「NAT / 容器兼容模式（仅监控）」，再复制完整安装命令。该选项与运维管理互斥，勾选其中一项会取消另一项；Windows 不显示此选项。普通 NAT 虚拟机使用默认监控安装即可，容器模式用于 Podman / LXC 等容器环境。
+
+NAT 客户端只需主动通过 HTTPS 访问控制台，无需监听公网端口。容器内 systemd 若报 `Failed to keep CAP_SYS_ADMIN`、`217/USER`，可能是在执行客户端之前应用服务隔离失败。先核对当前 `systemctl cat cloud-agent`、`systemctl show cloud-agent -p User -p ExecStart` 与本次启动日志；这不是内存不足或仍启用管理模式的证据。
+
+已有安装且确认无 `--management` 时，先停止重启循环，验证普通账户能执行客户端并完成一次上报（替换控制台地址）：
+
+```bash
+systemctl stop cloud-agent
+runuser -u cloudease-agent -- /opt/cloudease-lite/cloud-agent \
+  --server https://monitor.example.com \
+  --token-file /etc/cloudease-lite/agent-token --website-config= --once
+```
+
+看到 `Report accepted` 后，可明确选择 `--container-monitor` 重装，复用已有连接密钥：
+
+```bash
+(
+  set -eu
+  umask 077
+  script=$(mktemp)
+  trap 'rm -f -- "$script"' EXIT
+  status=$(curl --fail --silent --show-error --connect-timeout 15 --max-time 60 \
+    -o "$script" -w '%{http_code}' https://monitor.example.com/install-client.sh)
+  [ "$status" = 200 ] || { echo "安装脚本未返回 HTTP 200" >&2; exit 1; }
+  bash "$script" --server https://monitor.example.com \
+    --key-file /etc/cloudease-lite/agent-token --container-monitor
+)
+systemctl show cloud-agent -p User -p Group -p ExecStart -p Result -p ExecMainStatus
+journalctl -u cloud-agent -n 30 --no-pager
+```
+
+首次安装可省略 `--key-file`，在隐藏提示中输入连接密钥。需要 root、容器内运行的 systemd、`systemd-detect-virt` 和 curl（安装器也支持 wget）。此参数不能与 `--management` 同用，存在服务 drop-in 时拒绝安装，须先检查并备份冲突配置，不会自动删除配置。
+
+容器模式保留 `cloudease-agent` 普通账户、私有密钥权限、`NoNewPrivileges=true`、空 `CapabilityBoundingSet`、`MemoryMax=128M`，并设置 `UMask=0077`。只在明确选择时移除服务的 `ProtectSystem/Home/KernelTunables/KernelModules/ControlGroups`、`PrivateTmp/Devices` 和 `RestrictSUIDSGID`。这会减弱客户端的服务级文件系统/设备隔离及额外限制，普通账户仍能访问容器内文件权限允许的资源；外层容器限制不变，不授予 `CAP_SYS_ADMIN`，不设置 privileged。普通主机默认安装保留原隔离设置。若后续出现 cgroup 或内存限制错误，应单独诊断，不能直接删除内存限制。
+
+采集范围是容器内可见的 `/proc`、根文件系统和网络接口，不是宿主机完整状态。CPU/内存和磁盘容量可能来自共享宿主机视图；当前采集器未按 cgroup 配额换算，显示值不能当作小鸡的内存配额，也不能管理宿主机。普通账户预检若失败，应检查实际错误、密钥权限或 UID 映射，不要用 root/privileged 绕过。
+
 ## Windows 监控客户端
 
 在控制台下载 `cloud-agent.exe`。使用 PowerShell：

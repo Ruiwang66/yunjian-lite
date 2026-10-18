@@ -8,6 +8,7 @@ import (
 
 // Explicit projection keeps IP addresses and administration data private.
 type publicServerView struct {
+	CountryCode     string         `json:"country_code"`
 	ID              uint           `json:"id"`
 	Name            string         `json:"name"`
 	Status          string         `json:"status"`
@@ -23,7 +24,7 @@ type publicServerView struct {
 
 func (a *API) publicView(s models.Server) publicServerView {
 	v := a.view(s)
-	return publicServerView{ID: s.ID, Name: s.Name, Status: v.Status, OS: s.OS,
+	return publicServerView{CountryCode: s.CountryCode, ID: s.ID, Name: s.Name, Status: v.Status, OS: s.OS,
 		Platform: s.Platform, PlatformVersion: s.PlatformVersion, Arch: s.Arch,
 		CPUCores: s.CPUCores, Uptime: s.Uptime, LastSeen: s.LastSeen, Latest: v.Latest}
 }

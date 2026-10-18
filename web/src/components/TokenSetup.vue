@@ -5,7 +5,14 @@ import { ElMessage } from "element-plus";
 const props = defineProps({ token: String }),
   platform = ref("linux"),
   copied = ref(false),
-  management = ref(false);
+  management = ref(false),
+  containerMonitor = ref(false);
+function selectContainerMonitor(enabled) {
+  if (enabled) management.value = false;
+}
+function selectManagement(enabled) {
+  if (enabled) containerMonitor.value = false;
+}
 const shellQuote = (value) =>
   "'" + String(value).replaceAll("'", "'\"'\"'") + "'";
 const psQuote = (value) => "'" + String(value).replaceAll("'", "''") + "'";
@@ -46,7 +53,7 @@ const command = computed(() => {
     "  else",
     '    echo "请先安装 curl 或 wget。" >&2; exit 1',
     "  fi",
-    `  bash "$script" --server ${shellQuote(origin)}${management.value ? " --management" : ""}`,
+    `  bash "$script" --server ${shellQuote(origin)}${containerMonitor.value ? " --container-monitor" : management.value ? " --management" : ""}`,
     ")",
   ].join("\n");
 });
@@ -111,10 +118,18 @@ async function copy(value = command.value, isKey = false) {
       }}
     </p>
     <div v-if="platform === 'linux'" class="management-install-option">
-      <el-checkbox v-model="management">启用 v0.2 运维管理</el-checkbox>
+      <el-checkbox v-model="containerMonitor" @change="selectContainerMonitor">
+        NAT / 容器兼容模式（仅监控）
+      </el-checkbox>
+      <p class="small muted">
+        适用于 Podman / LXC 等容器小鸡；普通 NAT 虚拟机无需勾选。
+        使用普通账户，关闭部分服务隔离，保留 128 MB 内存限制，不增加容器权限。与运维管理互斥。
+      </p>
+      <el-checkbox v-model="management" @change="selectManagement">启用运维管理（v0.2 / v0.3）</el-checkbox>
       <p class="small muted">
         启用后客户端使用 root 执行白名单操作，支持
         Docker、服务和文件管理。未勾选时仅监控。
+        网站功能还需在主机配置 v0.3 网站白名单。
       </p>
     </div>
     <div v-if="safeOrigin" class="code-block">
