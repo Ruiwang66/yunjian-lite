@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const Version = "0.3.0"
+const Version = "0.4.0"
 const MaxFileBytes = 32 * 1024
 const MaxOutputBytes = 16 * 1024
 
@@ -37,26 +37,28 @@ type Service struct {
 	Allowed bool   `json:"allowed"`
 }
 type ManagementInfo struct {
-	Websites     *WebsiteInventory `json:"websites,omitempty"`
-	Version      string            `json:"version"`
-	Enabled      bool              `json:"enabled"`
-	Privileged   bool              `json:"privileged"`
-	DockerWrite  bool              `json:"docker_write"`
-	ServiceWrite bool              `json:"service_write"`
-	FileWrite    bool              `json:"file_write"`
-	FileRoots    []string          `json:"file_roots"`
-	Docker       DockerInfo        `json:"docker"`
-	Services     []Service         `json:"services"`
+	SecurityEnabled bool              `json:"security_enabled,omitempty"`
+	Websites        *WebsiteInventory `json:"websites,omitempty"`
+	Version         string            `json:"version"`
+	Enabled         bool              `json:"enabled"`
+	Privileged      bool              `json:"privileged"`
+	DockerWrite     bool              `json:"docker_write"`
+	ServiceWrite    bool              `json:"service_write"`
+	FileWrite       bool              `json:"file_write"`
+	FileRoots       []string          `json:"file_roots"`
+	Docker          DockerInfo        `json:"docker"`
+	Services        []Service         `json:"services"`
 }
 
 // Only typed, fixed actions cross the control plane; there is no shell or argv field.
 type ManagementRequest struct {
-	Website *WebsiteSpec `json:"website,omitempty"`
-	Action  string       `json:"action"`
-	Target  string       `json:"target,omitempty"`
-	Root    int          `json:"root,omitempty"`
-	Path    string       `json:"path,omitempty"`
-	Content string       `json:"content,omitempty"` // base64, bounded to 32 KiB after decoding
+	Security *SecurityOptions `json:"security,omitempty"`
+	Website  *WebsiteSpec     `json:"website,omitempty"`
+	Action   string           `json:"action"`
+	Target   string           `json:"target,omitempty"`
+	Root     int              `json:"root,omitempty"`
+	Path     string           `json:"path,omitempty"`
+	Content  string           `json:"content,omitempty"` // base64, bounded to 32 KiB after decoding
 }
 type ManagementTask struct {
 	ID        string            `json:"id"`
@@ -88,6 +90,9 @@ func MutatingAction(action string) bool {
 	return false
 }
 func KnownAction(action string) bool {
+	if action == "security.scan" {
+		return true
+	}
 	if WebsiteAction(action) {
 		return true
 	}

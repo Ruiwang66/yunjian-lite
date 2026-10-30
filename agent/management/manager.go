@@ -2,6 +2,7 @@
 package management
 
 import (
+	securitycollector "cloudease-lite/agent/security"
 	"cloudease-lite/shared"
 	"context"
 	"encoding/base64"
@@ -22,6 +23,7 @@ import (
 
 type Runner func(context.Context, string, ...string) ([]byte, error)
 type Manager struct {
+	security   *securitycollector.Collector
 	websites   *websiteManager
 	Enabled    bool
 	Roots      []string
@@ -94,6 +96,7 @@ func safeRoot(root string) bool {
 }
 func (m *Manager) Snapshot(ctx context.Context) shared.ManagementInfo {
 	info := shared.ManagementInfo{Version: shared.Version, Enabled: m.Enabled && m.platform == "linux", Privileged: m.privileged, FileRoots: []string{}, Services: []shared.Service{}}
+	info.SecurityEnabled = m.security != nil && info.Enabled
 	if m.platform != "linux" {
 		return info
 	}
@@ -117,6 +120,17 @@ func (m *Manager) Snapshot(ctx context.Context) shared.ManagementInfo {
 func (m *Manager) Execute(ctx context.Context, req shared.ManagementRequest) (any, error) {
 	if !m.Enabled || m.platform != "linux" {
 		return nil, errors.New("此客户端未启用 Linux 运维管理")
+	}
+	if req.Action == "security.scan" {
+		if m.security == nil || req.Security == nil || !req.Security.Valid() || req.Target != "" || req.Path != "" || req.Content != "" || req.Root != 0 || req.Website != nil {
+			return nil, errors.New("安全检测未授权或参数无效")
+		}
+		child, cancel := context.WithTimeout(ctx, 35*time.Second)
+		defer cancel()
+		return m.security.Scan(child, *req.Security), nil
+	}
+	if req.Security != nil {
+		return nil, errors.New("非安全任务不接受安全参数")
 	}
 	if !shared.KnownAction(req.Action) || req.Root < 0 || req.Root >= len(m.Roots) {
 		return nil, errors.New("操作或目录编号不允许")

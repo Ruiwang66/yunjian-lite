@@ -153,6 +153,13 @@ onUnmounted(() => {
             >11</span
           ></router-link
         >
+        <router-link
+          v-if="['admin', 'operator'].includes(user?.role)"
+          to="/security-center"
+          ><ShieldCheck :size="18" />安全中心<span class="nav-short"
+            >12</span
+          ></router-link
+        >
       </nav>
       <div class="sidebar-foot">
         <div class="release-card">
@@ -161,7 +168,7 @@ onUnmounted(() => {
           >
         </div>
         <div class="version-row">
-          <span>v0.3.0</span><span>开源 / MIT</span>
+          <span>v0.4.0</span><span>开源 / MIT</span>
         </div>
       </div>
     </aside>
@@ -178,6 +185,7 @@ onUnmounted(() => {
               "/services": "服务管理",
               "/files": "文件管理",
               "/security": "命令与安全",
+              "/security-center": "安全中心",
               "/system": "系统信息",
               "/settings": "设置",
               "/websites": "网站管理",

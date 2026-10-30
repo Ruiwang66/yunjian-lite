@@ -13,6 +13,9 @@ func ExpireOperations(db *gorm.DB, now time.Time) error {
 			return err
 		}
 		for _, task := range tasks {
+			if err := FailSecurityScan(tx, task, "expired", "任务超时或客户端离线", now); err != nil {
+				return err
+			}
 			if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "expired", "updated_at": now}).Error; err != nil {
 				return err
 			}

@@ -5,6 +5,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	sc "cloudease-lite/agent/security"
 	"cloudease-lite/server/api"
 	"cloudease-lite/server/config"
 	"cloudease-lite/server/database"
@@ -34,8 +35,13 @@ import (
 
 func main() {
 	root := flag.String("root", ".runtime/v03-preview", "Isolated local fixture directory")
+	listen := flag.String("listen", "127.0.0.1:5053", "Loopback-only local preview address")
+	securityDemo := flag.Bool("security-demo", false, "Explicitly labeled v0.4 fixture; not real Linux observations")
 	web := flag.String("web", "web/dist", "Built frontend path")
 	flag.Parse()
+	if !strings.HasPrefix(*listen, "127.0.0.1:") {
+		log.Fatal("local preview must bind IPv4 loopback")
+	}
 	abs, _ := filepath.Abs(*root)
 	os.MkdirAll(abs, 0700)
 	db, err := database.Open(filepath.Join(abs, "data"))
@@ -45,6 +51,9 @@ func main() {
 	conn, _ := db.DB()
 	defer conn.Close()
 	password := "CloudEase03!Test"
+	if *securityDemo {
+		password = "CloudEase04!Test"
+	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	for _, role := range []string{"admin", "operator", "viewer"} {
 		var count int64
@@ -55,8 +64,12 @@ func main() {
 	}
 	key, _ := service.RandomToken()
 	var server models.Server
-	db.Where("name = ?", "本地演示 · Linux 操作模拟").First(&server)
-	server.Name = "本地演示 · Linux 操作模拟"
+	serverName := "本地演示 · Linux 操作模拟"
+	if *securityDemo {
+		serverName = "本地安全测试夹具 · Linux 检测输入模拟"
+	}
+	db.Where("name = ?", serverName).First(&server)
+	server.Name = serverName
 	server.Token = service.HashToken(key)
 	server.Status = "online"
 	if server.CountryCode == "" {
@@ -73,7 +86,7 @@ func main() {
 	}
 	hub := live.New()
 	defer hub.Close()
-	cfg := config.Config{Listen: "127.0.0.1:5053", DataDir: filepath.Join(abs, "data"), WebDir: *web, SessionTTL: 24 * time.Hour, OfflineAfter: 90 * time.Second, RetentionDays: 30, RequireReportFreshness: true}
+	cfg := config.Config{Listen: *listen, DataDir: filepath.Join(abs, "data"), WebDir: *web, SessionTTL: 24 * time.Hour, OfflineAfter: 90 * time.Second, RetentionDays: 30, RequireReportFreshness: true}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go service.Monitor(ctx, db, cfg.OfflineAfter, 30, hub.Broadcast)
@@ -125,6 +138,7 @@ func main() {
 		}
 		r := shared.Report{OS: "linux", Platform: "ubuntu", PlatformVersion: "24.04（模拟）", Arch: "amd64", CPUCores: 2, CPU: 5, Memory: 32, Disk: 25, MemoryTotal: 2147483648, MemoryUsed: 687194767, DiskTotal: 42949672960, DiskUsed: 10737418240, SentAt: time.Now().UnixMilli(), Nonce: strings.Repeat("A", 22), Management: &shared.ManagementInfo{Version: shared.Version, Enabled: true, Privileged: true, FileRoots: []string{"/opt/cloud-ease"}, Websites: &shared.WebsiteInventory{Demo: true, Enabled: true, Sites: specs, Checks: checks, Nginx: shared.NginxInfo{Available: true, Version: "nginx/1.24.0（演示）", State: "active"}, PHP: shared.PHPInfo{Available: true, Version: "PHP 8.2.18（演示）", FPMState: "php8.2-fpm.service: active", Extensions: []string{"curl", "gd", "mysqli", "pdo", "openssl"}, Warnings: []string{}}}}}
 		nonce, _ := service.RandomToken()
+		r.Management.SecurityEnabled = *securityDemo
 		r.Nonce = nonce[:22]
 		call("POST", "/api/agent/report", r)
 	}
@@ -155,6 +169,44 @@ func main() {
 		var operationErr error
 		domain := task.Request.Target
 		switch task.Request.Action {
+		case "security.scan":
+			if !*securityDemo || task.Request.Security == nil {
+				operationErr = fmt.Errorf("安全检测模拟未启用")
+				break
+			}
+			collector := sc.New(func(_ context.Context, name string, args ...string) ([]byte, error) {
+				switch name {
+				case "sshd":
+					return []byte("permitrootlogin yes\npasswordauthentication yes\npubkeyauthentication yes\npermitemptypasswords no\nmaxauthtries 6\n"), nil
+				case "ss":
+					return []byte("tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:((sshd))"), nil
+				case "ufw":
+					return []byte("Status: active\nDefault: deny (incoming), allow (outgoing)"), nil
+				case "docker":
+					return []byte(""), nil
+				}
+				return nil, fmt.Errorf("本地夹具不模拟此工具")
+			})
+			collector.Read = func(name string) ([]byte, error) {
+				if name == "/etc/passwd" {
+					return []byte("root:x:0:0::/root:/bin/bash"), nil
+				}
+				if name == "/etc/os-release" {
+					return []byte("PRETTY_NAME=Linux（演示输入）"), nil
+				}
+				if name == "/proc/sys/kernel/osrelease" {
+					return []byte("仅本地规则输入，不是宿主机内核"), nil
+				}
+				return nil, os.ErrPermission
+			}
+			collector.Stat = func(string) (os.FileInfo, error) { return nil, os.ErrPermission }
+			collector.Website = func(context.Context) []shared.SecurityCheck {
+				return []shared.SecurityCheck{sc.Check("website.demo_tls", "website", "演示：证书即将到期", "risk", "high", "明确标注的模拟证书，剩余 6 天", "仅用于本地页面与规则测试", "真实结果需 Linux 客户端与授权站点")}
+			}
+			value = collector.Scan(ctx, *task.Request.Security)
+			r := value.(shared.SecurityReport)
+			r.Scope = "本地安全测试夹具：Linux/SSH/证书输入明确模拟；用于测试任务通道与规则，不代表真实主机检测"
+			value = r
 		case "website.check", "ssl.check", "domain.check":
 			value = check(domain)
 		case "nginx.read":

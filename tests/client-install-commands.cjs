@@ -55,3 +55,13 @@ assert.ok(containerContext.containerCleared,"management choice must clear contai
 assert.ok(containerContext.managementCommand.includes("--management")&&!containerContext.managementCommand.includes("--container-monitor"));
 assert.ok(!containerContext.windows.includes("--container-monitor")&&!containerContext.windows.includes("--management"),"Windows received Linux-only flags");
 console.log("CONTAINER_MONITOR_INSTALL_OPT_IN_OK: Linux explicit choice; modes exclusive; no key in command.");
+
+const securityContext={URL,computed:fn=>({get value(){return fn();}}),ref:value=>({value}),defineProps:()=>({token:key}),location:{origin:"https://monitor.example"}};
+vm.createContext(securityContext);
+vm.runInContext(source+`\nglobalThis.initial=command.value;management.value=true;securityScan.value=true;globalThis.securityCommand=command.value;containerMonitor.value=true;selectContainerMonitor(true);globalThis.compatible=command.value;platform.value="windows";globalThis.windows=command.value;`,securityContext);
+assert.ok(!securityContext.initial.includes("--security"));
+assert.ok(securityContext.securityCommand.includes("--management --security"));
+assert.ok(!securityContext.securityCommand.includes(key));
+assert.ok(!securityContext.compatible.includes("--security"));
+assert.ok(!securityContext.windows.includes("--security"));
+console.log("SECURITY_INSTALL_OPT_IN_OK: explicit Linux security; no compatibility privilege expansion.");

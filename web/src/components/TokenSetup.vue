@@ -6,12 +6,17 @@ const props = defineProps({ token: String }),
   platform = ref("linux"),
   copied = ref(false),
   management = ref(false),
+  securityScan = ref(false),
   containerMonitor = ref(false);
 function selectContainerMonitor(enabled) {
-  if (enabled) management.value = false;
+  if (enabled) {
+    management.value = false;
+    securityScan.value = false;
+  }
 }
 function selectManagement(enabled) {
   if (enabled) containerMonitor.value = false;
+  else securityScan.value = false;
 }
 const shellQuote = (value) =>
   "'" + String(value).replaceAll("'", "'\"'\"'") + "'";
@@ -53,7 +58,7 @@ const command = computed(() => {
     "  else",
     '    echo "请先安装 curl 或 wget。" >&2; exit 1',
     "  fi",
-    `  bash "$script" --server ${shellQuote(origin)}${containerMonitor.value ? " --container-monitor" : management.value ? " --management" : ""}`,
+    `  bash "$script" --server ${shellQuote(origin)}${containerMonitor.value ? " --container-monitor" : management.value ? " --management" + (securityScan.value ? " --security" : "") : ""}`,
     ")",
   ].join("\n");
 });
@@ -123,17 +128,32 @@ async function copy(value = command.value, isKey = false) {
       </el-checkbox>
       <p class="small muted">
         适用于 Podman / LXC 等容器小鸡；普通 NAT 虚拟机无需勾选。
-        使用普通账户，关闭部分服务隔离，保留 128 MB 内存限制，不增加容器权限。与运维管理互斥。
+        使用普通账户，关闭部分服务隔离，保留 128 MB
+        内存限制，不增加容器权限。与运维管理互斥。
       </p>
-      <el-checkbox v-model="management" @change="selectManagement">启用运维管理（v0.2 / v0.3）</el-checkbox>
+      <el-checkbox v-model="management" @change="selectManagement"
+        >启用运维管理（v0.2–v0.4）</el-checkbox
+      >
       <p class="small muted">
         启用后客户端使用 root 执行白名单操作，支持
-        Docker、服务和文件管理。未勾选时仅监控。
-        网站功能还需在主机配置 v0.3 网站白名单。
+        Docker、服务和文件管理。未勾选时仅监控。 网站功能还需在主机配置 v0.3
+        网站白名单。
+      </p>
+      <el-checkbox
+        v-model="securityScan"
+        :disabled="!management || containerMonitor"
+        >启用 v0.4 只读安全检测</el-checkbox
+      >
+      <p class="small muted">
+        默认关闭；需要 Linux
+        运维授权。安全日志另需主机本地白名单；不自动修改配置、封禁 IP
+        或增加系统能力。
       </p>
     </div>
     <div v-if="safeOrigin" class="code-block">
-      <pre>{{ command }}</pre>
+      <pre tabindex="0" aria-label="完整安装命令，可使用方向键滚动">{{
+        command
+      }}</pre>
       <button
         @click="copy()"
         :aria-label="copied ? '已复制安装命令' : '复制完整安装命令'"

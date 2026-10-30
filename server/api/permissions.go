@@ -13,6 +13,10 @@ func validRole(role string) bool { return role == "admin" || role == "operator" 
 func (a *API) permissions(c *gin.Context) {
 	u := c.MustGet("user").(models.User)
 	path := c.Request.URL.Path
+	if strings.HasPrefix(path, "/api/security/") && u.Role != "admin" && u.Role != "operator" {
+		fail(c, 403, "当前角色未获安全中心访问权限")
+		return
+	}
 	write := c.Request.Method != "GET" && c.Request.Method != "HEAD"
 	own := path == "/api/auth/logout" || path == "/api/auth/password"
 	if !validRole(u.Role) || (write && !own && u.Role == "viewer") || (strings.HasPrefix(path, "/api/users") || path == "/api/roles") && u.Role != "admin" {

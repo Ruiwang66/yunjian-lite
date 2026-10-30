@@ -44,6 +44,9 @@ func Open(dir string) (*gorm.DB, error) {
 		return nil, err
 	}
 	roles := []models.Role{{Name: "admin", Description: "全部权限及用户管理"}, {Name: "operator", Description: "管理服务器和白名单运维操作"}, {Name: "viewer", Description: "只读监控及运维数据"}}
+	if err := db.AutoMigrate(&models.SecurityScan{}, &models.SecurityFinding{}, &models.SecurityEvent{}, &models.SecurityAlert{}, &models.SecurityAlertRead{}, &models.SecurityScore{}, &models.SecurityRule{}); err != nil {
+		return nil, err
+	}
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&roles).Error; err != nil {
 		return nil, err
 	}

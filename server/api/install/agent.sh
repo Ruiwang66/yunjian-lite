@@ -8,10 +8,12 @@ die() { echo "安装失败：$*" >&2; exit 1; }
 command -v systemctl >/dev/null && [ -d /run/systemd/system ] || die "需要正在运行的 systemd。"
 server= token= key_file=
 management=false
+security=false
 container_monitor=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --management) management=true; shift ;;
+        --security) security=true; shift ;;
         --container-monitor) container_monitor=true; shift ;;
         --server) [ "$#" -ge 2 ] || die "--server 缺少地址"; server="$2"; shift 2 ;;
         --key-file) [ "$#" -ge 2 ] || die "缺少密钥文件"; key_file="$2"; shift 2 ;;
@@ -19,6 +21,7 @@ while [ "$#" -gt 0 ]; do
         *) die "未知参数：$1" ;;
     esac
 done
+[ "$security" = false ] || [ "$management" = true ] || die "安全检测需要显式 --management --security；普通及容器兼容模式不能启用。"
 if [ "$container_monitor" = true ]; then
     [ "$management" = false ] || die "--container-monitor 仅支持监控，不能同时启用 --management。"
     command -v systemd-detect-virt >/dev/null && systemd-detect-virt --container --quiet || die "容器兼容模式仅用于 systemd 能识别的容器。"
@@ -161,6 +164,13 @@ if [ "$management" = true ]; then
         printf 'CLOUDEASE_WEBSITE_CONFIG=/etc/cloudease-lite/websites.json\n' >> "$work/agent.env"
         echo "检测到主机网站白名单，将由 v0.3 客户端校验后启用。自定义写入目录请保留 systemd drop-in 配置。"
     fi
+fi
+if [ "$security" = true ]; then
+    sed -i -e 's|^ExecStart=.*|& --security|' "$work/cloud-agent.service"
+    if [ -f /etc/cloudease-lite/security.json ] && [ ! -L /etc/cloudease-lite/security.json ]; then
+        sed -i -e 's|^ExecStart=.*|& --security-config /etc/cloudease-lite/security.json|' "$work/cloud-agent.service"
+    fi
+    echo "已明确启用只读安全检测；日志仅在本地白名单授权后读取，不增加 capabilities。"
 fi
 if systemctl is-active --quiet cloud-agent; then systemctl stop cloud-agent; fi
 install -m 0755 "$work/cloud-agent" /opt/cloudease-lite/cloud-agent

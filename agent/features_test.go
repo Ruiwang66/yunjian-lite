@@ -1,11 +1,37 @@
 package main
 
 import (
+	"cloudease-lite/shared"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func TestSecurityProtocolDoesNotBreakOldControllers(t *testing.T) {
+	for _, tc := range []struct {
+		body string
+		want bool
+	}{{`{"management_protocol":1,"website_protocol":1}`, false}, {`{"security_protocol":1}`, true}, {`{"security_protocol":2}`, false}} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") != "Bearer test-key" {
+				t.Error("unauthenticated feature check")
+			}
+			w.Write([]byte(tc.body))
+		}))
+		if got := supportsSecurity(context.Background(), srv.Client(), srv.URL, "test-key"); got != tc.want {
+			t.Fatal(tc.body, got)
+		}
+		srv.Close()
+	}
+	data, _ := json.Marshal(shared.ManagementInfo{})
+	var fields map[string]any
+	json.Unmarshal(data, &fields)
+	if _, ok := fields["security_enabled"]; ok {
+		t.Fatal("new field sent to old peer without capability")
+	}
+}
 
 func TestAuthenticatedVersionNegotiation(t *testing.T) {
 	for _, tc := range []struct {

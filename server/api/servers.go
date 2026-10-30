@@ -163,6 +163,11 @@ func (a *API) deleteServer(c *gin.Context) {
 			}
 		}
 		// Preserve operation audit records when the monitored server is removed.
+		for _, model := range []any{&models.SecurityScan{}, &models.SecurityFinding{}, &models.SecurityEvent{}, &models.SecurityAlert{}, &models.SecurityScore{}, &models.SecurityRule{}} {
+			if err := tx.Where("server_id = ?", s.ID).Delete(model).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Model(&models.OperationLog{}).Where("server_id = ? AND status IN ?", s.ID, []string{"queued", "running"}).Updates(map[string]any{"status": "cancelled", "updated_at": time.Now().UTC()}).Error; err != nil {
 			return err
 		}

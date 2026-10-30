@@ -46,6 +46,8 @@ func main() {
 	once := flag.Bool("once", false, "Collect and report one sample, then exit")
 	allowHTTP := flag.Bool("allow-insecure-http", false, "Allow public HTTP for an isolated development environment only")
 	manage := flag.Bool("management", false, "Enable Linux management with local allowlists (off by default)")
+	securityScan := flag.Bool("security", false, "Explicitly enable Linux read-only security checks; requires --management")
+	securityConfig := flag.String("security-config", "", "Root-owned local log allowlist JSON; no logs read unless configured")
 	roots := flag.String("file-roots", env("CLOUDEASE_FILE_ROOTS", ""), "Comma-separated allowed file roots")
 	services := flag.String("allowed-services", env("CLOUDEASE_ALLOWED_SERVICES", ""), "Comma-separated systemd allowlist")
 	websiteConfig := flag.String("website-config", env("CLOUDEASE_WEBSITE_CONFIG", ""), "Root-owned JSON allowlist for website management (off by default)")
@@ -79,6 +81,9 @@ func main() {
 	if err = manager.ConfigureWebsites(*websiteConfig); err != nil {
 		log.Fatal(err)
 	}
+	if err = manager.ConfigureSecurity(*securityScan, *securityConfig); err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("Client startup: OS=%s %s", runtime.GOOS, manager)
 	var worker sync.WaitGroup
 	if *manage && runtime.GOOS == "linux" && !*once {
@@ -96,6 +101,9 @@ func main() {
 		snapshotCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 		next := manager.Snapshot(snapshotCtx)
 		cancel()
+		if !supportsSecurity(ctx, client, u.String(), *token) {
+			next.SecurityEnabled = false
+		}
 		if supportsWebsites(ctx, client, u.String(), *token) {
 			websiteCtx, websiteCancel := context.WithTimeout(ctx, 8*time.Second)
 			next.Websites = manager.WebsiteSnapshot(websiteCtx)

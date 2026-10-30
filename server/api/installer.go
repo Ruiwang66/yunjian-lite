@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-//go:embed install/agent.sh install/agent.ps1 install/uninstall.sh install/uninstall.ps1
+//go:embed install/agent.sh install/agent.ps1 install/uninstall.sh install/uninstall.ps1 install/enable-security.sh
 var installers embed.FS
 
 func serveInstaller(name string) gin.HandlerFunc {

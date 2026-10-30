@@ -22,6 +22,9 @@ func Monitor(ctx context.Context, db *gorm.DB, offline time.Duration, retentionD
 			if err := ExpireOperations(db, now); err != nil {
 				log.Printf("operation cleanup: %v", err)
 			}
+			if err := TickSecurity(db, now); err != nil {
+				log.Printf("security scheduler: %v", err)
+			}
 			changed := false
 			err := db.Transaction(func(tx *gorm.DB) error {
 				items := []models.Server{}
@@ -45,6 +48,9 @@ func Monitor(ctx context.Context, db *gorm.DB, offline time.Duration, retentionD
 				broadcast("status_changed")
 			}
 			if now.Sub(lastCleanup) > time.Hour {
+				if err := CleanupSecurity(db, now); err != nil {
+					log.Printf("security retention: %v", err)
+				}
 				cutoff := now.Add(-time.Duration(retentionDays) * 24 * time.Hour)
 				for _, entry := range []struct {
 					Model  any

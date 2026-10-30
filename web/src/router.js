@@ -15,6 +15,7 @@ const Operations = () => import("./views/Operations.vue");
 const Settings = () => import("./views/Settings.vue");
 const Website = () => import("./views/Website.vue");
 const SSL = () => import("./views/SSL.vue");
+const SecurityCenter = () => import("./views/SecurityCenter.vue");
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -29,6 +30,11 @@ const router = createRouter({
     { path: "/services", component: Services },
     { path: "/files", component: Files },
     { path: "/security", component: Security },
+    {
+      path: "/security-center",
+      component: SecurityCenter,
+      meta: { securityCenter: true },
+    },
     { path: "/system", component: System },
     { path: "/operations", component: Operations },
     { path: "/settings", component: Settings },
@@ -46,6 +52,11 @@ router.beforeEach(async (to) => {
       return "/login";
     }
   }
+  if (
+    to.meta.securityCenter &&
+    !["admin", "operator"].includes(user.value?.role)
+  )
+    return "/admin";
   return true;
 });
 export default router;

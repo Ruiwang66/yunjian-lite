@@ -42,6 +42,12 @@ systemctl() { printf '%s\\n' "$FIXTURE_UNIT"; return "$FIXTURE_SHOW_STATUS"; }
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("不能同时", result.stderr)
 
+    def test_security_requires_explicit_management_and_never_container_mode(self):
+        for args in [("--security",), ("--security", "--container-monitor")]:
+            self.assertNotEqual(self.shell(OPTIONS, args).returncode, 0)
+        result = self.shell(OPTIONS, ("--management", "--security"), virt=1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_only_identified_containers(self):
         result = self.shell(OPTIONS, ("--container-monitor",), virt=1)
         self.assertNotEqual(result.returncode, 0)

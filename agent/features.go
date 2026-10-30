@@ -55,3 +55,25 @@ func supportsWebsites(ctx context.Context, client *http.Client, origin, key stri
 	}
 	return json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&features) == nil && features.WebsiteProtocol == 1
 }
+
+func supportsSecurity(ctx context.Context, client *http.Client, origin, key string) bool {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", origin+"/api/agent/check", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
+	response, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		return false
+	}
+	var features struct {
+		SecurityProtocol int `json:"security_protocol"`
+	}
+	return json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&features) == nil && features.SecurityProtocol == 1
+}

@@ -50,7 +50,7 @@ func TestV01MigrationPreservesUsersServersSessions(t *testing.T) {
 		if db.First(&session, 1).Error != nil || session.TokenHash != "existing-session-hash" {
 			t.Fatal("session lost")
 		}
-		for _, table := range []string{"roles", "operation_logs", "docker_containers", "services", "files", "management_tasks", "websites", "ssl_certificates", "domains", "backup_tasks", "health_checks"} {
+		for _, table := range []string{"security_scans", "security_findings", "security_events", "security_alerts", "security_alert_reads", "security_scores", "security_rules", "roles", "operation_logs", "docker_containers", "services", "files", "management_tasks", "websites", "ssl_certificates", "domains", "backup_tasks", "health_checks"} {
 			if !db.Migrator().HasTable(table) {
 				t.Fatalf("missing table %s", table)
 			}

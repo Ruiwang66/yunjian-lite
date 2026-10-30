@@ -85,9 +85,12 @@ var containerID = regexp.MustCompile(`^[a-f0-9]{12,64}$`)
 var serviceName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}(?:\.service)?$`)
 
 func operatorAction(action string) bool {
-	return shared.MutatingAction(action) || strings.HasPrefix(action, "command.")
+	return action == "security.scan" || shared.MutatingAction(action) || strings.HasPrefix(action, "command.")
 }
 func validManagementRequest(req shared.ManagementRequest) bool {
+	if req.Security != nil || req.Action == "security.scan" {
+		return false
+	}
 	if req.Website != nil || shared.WebsiteAction(req.Action) {
 		return false
 	} // Website routes bind targets to a persisted, host-authorized site.
@@ -291,6 +294,9 @@ func (a *API) nextOperation(c *gin.Context) {
 		var u models.User
 		var session models.Session
 		if task.KeyHash != s.Token || tx.First(&u, task.UserID).Error != nil || tx.Where("id = ? AND user_id = ? AND expires_at > ?", task.SessionID, task.UserID, now).First(&session).Error != nil || !validRole(u.Role) || operatorAction(task.Action) && u.Role == "viewer" {
+			if err := service.FailSecurityScan(tx, task, "cancelled", "任务授权已失效", now); err != nil {
+				return err
+			}
 			if err := tx.Model(&task).Updates(map[string]any{"status": "cancelled", "request_json": "", "updated_at": now}).Error; err != nil {
 				return err
 			}
@@ -309,6 +315,11 @@ func (a *API) nextOperation(c *gin.Context) {
 		var request shared.ManagementRequest
 		if json.Unmarshal([]byte(task.RequestJSON), &request) != nil {
 			return errors.New("invalid operation")
+		}
+		if task.Action == "security.scan" {
+			if err := tx.Model(&models.SecurityScan{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "running", "updated_at": now}).Error; err != nil {
+				return err
+			}
 		}
 		reply = &shared.ManagementTask{ID: task.ID, Lease: lease, ExpiresAt: task.ExpiresAt.UnixMilli(), Request: request}
 		return tx.Model(&models.OperationLog{}).Where("id = ?", task.OperationLogID).Updates(map[string]any{"status": "running", "updated_at": now}).Error
@@ -364,6 +375,8 @@ func (a *API) operationResult(c *gin.Context) {
 			if err := cacheResult(tx, task, in.Data, now); err != nil {
 				return err
 			}
+		} else if err := service.FailSecurityScan(tx, task, "failed", in.Error, now); err != nil {
+			return err
 		}
 		in.Lease = ""
 		in.Error = shared.RedactOutput(shared.SafeLabel(in.Error))
@@ -396,8 +409,12 @@ func (a *API) operationResult(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
+	a.Hub.Broadcast("security_changed")
 }
 func cacheResult(tx *gorm.DB, task models.ManagementTask, data json.RawMessage, now time.Time) error {
+	if task.Action == "security.scan" {
+		return service.StoreSecurityReport(tx, task, data, now)
+	}
 	if shared.WebsiteAction(task.Action) {
 		return cacheWebsiteResult(tx, task, data, now)
 	}
@@ -469,6 +486,9 @@ func (a *API) operationLogs(c *gin.Context) {
 		return
 	}
 	q := a.DB.Model(&models.OperationLog{})
+	if c.MustGet("user").(models.User).Role == "viewer" {
+		q = q.Where("action NOT LIKE ? AND action NOT LIKE ?", "security.%", "%/security/%")
+	}
 	if id := c.Query("server_id"); id != "" {
 		if !numericID(id) {
 			fail(c, 400, "服务器编号无效")
