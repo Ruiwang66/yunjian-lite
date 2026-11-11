@@ -93,7 +93,7 @@ public = call(client(), 'GET', '/api/public/servers')[1]
 assert 'security_enabled' not in json.dumps(public) and 'grade_json' not in json.dumps(public)
 
 windows_id, windows_key = preview_server('本机 Windows · 真实只读监控样本', '')
-binary = ROOT / 'artifacts/v04-development/local-preview/downloads/cloud-agent.exe'
+binary = ROOT / 'bin/downloads/cloud-agent.exe'
 env = dict(os.environ, CLOUDEASE_TOKEN=windows_key)
 env.pop('CLOUDEASE_TOKEN_FILE', None)
 _, before_samples = call(admin, 'GET', f'/api/servers/{windows_id}/metrics?hours=1')

@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func openDownload(name string) (*os.File, error) {
@@ -34,12 +36,28 @@ func openDownload(name string) (*os.File, error) {
 	return f, nil
 }
 func (a *API) downloadAgent(c *gin.Context) {
+	if a.downloadSlots != nil {
+		select {
+		case a.downloadSlots <- struct{}{}:
+			defer func() { <-a.downloadSlots }()
+		default:
+			c.Header("Retry-After", "5")
+			fail(c, 503, "下载并发已满，请稍后重试")
+			return
+		}
+	}
 	f, err := openDownload(c.Param("file"))
 	if err != nil {
 		fail(c, 404, "安装包不存在")
 		return
 	}
 	defer f.Close()
+	// Fixed release files may be 64 MiB. Keep the short API write timeout for
+	// JSON, but allow a bounded five-minute transfer on slower NAT links.
+	if err := http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(5 * time.Minute)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		fail(c, 503, "无法开始下载安装包")
+		return
+	}
 	info, _ := f.Stat()
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": info.Name()}))
 	c.Header("Content-Type", "application/octet-stream")

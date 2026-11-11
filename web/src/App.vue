@@ -168,7 +168,7 @@ onUnmounted(() => {
           >
         </div>
         <div class="version-row">
-          <span>v0.4.0</span><span>开源 / MIT</span>
+          <span>v0.5.0</span><span>开源 / MIT</span>
         </div>
       </div>
     </aside>

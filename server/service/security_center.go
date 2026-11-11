@@ -224,6 +224,7 @@ func TickSecurity(db *gorm.DB, now time.Time) error {
 	return nil
 }
 func CleanupSecurity(db *gorm.DB, now time.Time) error {
+	now = now.UTC()
 	var servers []models.Server
 	if e := db.Select("id").Find(&servers).Error; e != nil {
 		return e
@@ -239,10 +240,10 @@ func CleanupSecurity(db *gorm.DB, now time.Time) error {
 		}
 		cutoff := now.Add(-time.Duration(days) * 24 * time.Hour)
 		for _, model := range []any{&models.SecurityScan{}, &models.SecurityFinding{}, &models.SecurityEvent{}, &models.SecurityAlert{}, &models.SecurityScore{}} {
-			if e := db.Where("server_id = ? AND created_at < ?", s.ID, cutoff).Delete(model).Error; e != nil {
+			if e := deleteBatches(db, model, "server_id = ? AND created_at < ?", s.ID, cutoff); e != nil {
 				return e
 			}
 		}
 	}
-	return db.Where("alert_id NOT IN (?)", db.Model(&models.SecurityAlert{}).Select("id")).Delete(&models.SecurityAlertRead{}).Error
+	return deleteBatches(db, &models.SecurityAlertRead{}, "alert_id NOT IN (?)", db.Model(&models.SecurityAlert{}).Select("id"))
 }

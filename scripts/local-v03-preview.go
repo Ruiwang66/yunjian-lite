@@ -169,6 +169,10 @@ func main() {
 		var operationErr error
 		domain := task.Request.Target
 		switch task.Request.Action {
+		case "command.journal":
+			// Only this loopback fixture returns synthetic long logs. No host
+			// journal or shell is accessed; markup must remain literal UI text.
+			value = map[string]any{"output": strings.Repeat("本地日志模拟 <script>fixture</script> · line\n", 150)}
 		case "security.scan":
 			if !*securityDemo || task.Request.Security == nil {
 				operationErr = fmt.Errorf("安全检测模拟未启用")

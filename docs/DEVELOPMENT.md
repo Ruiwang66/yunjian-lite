@@ -25,6 +25,8 @@ Vite 监听 127.0.0.1:5173，并代理 API/WS、安装/卸载脚本到 8080。�
 
 ## 测试与构建
 
+v0.5 最低 Go 1.27.3。前端增加 `npm.cmd test --prefix web`，使用 Node 内置测试运行器检查异步响应、取消和重连生命周期，不新增测试框架。完整命令、基线与未测项见 [v0.5 验证记录](V0.5-VERIFICATION.md)。
+
 ```powershell
 & .\.tools\go\bin\go.exe test -tags nomsgpack ./...
 & .\.tools\go\bin\go.exe vet -tags nomsgpack ./...

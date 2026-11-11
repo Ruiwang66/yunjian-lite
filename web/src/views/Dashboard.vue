@@ -22,6 +22,7 @@ import {
   Map,
 } from "lucide-vue-next";
 import { api, publicApi } from "../api";
+import { createRefresh } from "../refresh";
 const props = defineProps({ publicView: Boolean });
 import { canOperate } from "../management";
 import { revision } from "../state";
@@ -76,41 +77,40 @@ const serverListView = computed(
 const title = computed(() =>
   serverListView.value ? "服务器" : "基础设施概览",
 );
-let poll,
-  clock,
-  busy = false;
-async function refresh() {
-  if (busy) return;
-  busy = true;
-  try {
-    const [items, events] = await Promise.all([
-      props.publicView ? publicApi.servers() : api.servers(),
+let poll, clock;
+const refresh = createRefresh(
+  (signal) =>
+    Promise.all([
+      (props.publicView ? publicApi : api).servers({ signal }),
       props.publicView || serverListView.value
         ? Promise.resolve({ items: [] })
-        : api.logs({ limit: 5 }),
-    ]);
+        : api.logs({ limit: 5 }, { signal }),
+    ]),
+  ([items, events]) => {
     servers.value = items;
     logs.value = events.items;
     error.value = "";
     loaded.value = Date.now();
-  } catch (e) {
+  },
+  (e) => {
     error.value = e.message;
-  } finally {
+  },
+  () => {
     loading.value = false;
-    busy = false;
-  }
-}
+  },
+);
 onMounted(() => {
   refresh();
   poll = setInterval(refresh, 4000);
   clock = setInterval(() => (now.value = Date.now()), 1000);
 });
 onUnmounted(() => {
+  refresh.stop();
   clearInterval(poll);
   clearInterval(clock);
 });
 watch(revision, refresh);
-watch(serverListView, refresh);
+watch(serverListView, () => refresh(true));
 </script>
 <template>
   <div class="page-heading">

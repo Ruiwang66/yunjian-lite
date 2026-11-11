@@ -3,6 +3,7 @@ package api
 import (
 	"cloudease-lite/server/models"
 	"cloudease-lite/server/service"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -57,7 +58,27 @@ func (a *API) login(c *gin.Context) {
 		return
 	}
 	s := models.Session{TokenHash: service.HashToken(raw), UserID: u.ID, ExpiresAt: time.Now().UTC().Add(a.Config.SessionTTL)}
-	if a.DB.Create(&s).Error != nil {
+	// bcrypt runs outside the SQLite write transaction, but password/role
+	// changes that raced with it must prevent a new session for the old hash.
+	err = a.DB.Transaction(func(tx *gorm.DB) error {
+		var current models.User
+		if err := tx.Where("id = ? AND password = ?", u.ID, u.Password).First(&current).Error; err != nil {
+			return err
+		}
+		if !validRole(current.Role) {
+			return gorm.ErrRecordNotFound
+		}
+		if err := tx.Create(&s).Error; err != nil {
+			return err
+		}
+		u = current
+		return nil
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		fail(c, 401, "账号或密码错误")
+		return
+	}
+	if err != nil {
 		dbError(c)
 		return
 	}

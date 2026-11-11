@@ -97,14 +97,15 @@ func main() {
 	var snapshotMu sync.RWMutex
 	var extensions bool
 	refreshSnapshot := func() {
-		enabled := supportsExtensions(ctx, client, u.String(), *token)
+		features := negotiateFeatures(ctx, client, u.String(), *token)
+		enabled := features.ManagementProtocol == 1
 		snapshotCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 		next := manager.Snapshot(snapshotCtx)
 		cancel()
-		if !supportsSecurity(ctx, client, u.String(), *token) {
+		if features.SecurityProtocol != 1 {
 			next.SecurityEnabled = false
 		}
-		if supportsWebsites(ctx, client, u.String(), *token) {
+		if features.WebsiteProtocol == 1 {
 			websiteCtx, websiteCancel := context.WithTimeout(ctx, 8*time.Second)
 			next.Websites = manager.WebsiteSnapshot(websiteCtx)
 			websiteCancel()

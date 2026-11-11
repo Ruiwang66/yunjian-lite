@@ -10,6 +10,7 @@ import (
 
 // Monitor records offline transitions and bounds metric/log/session storage.
 func Monitor(ctx context.Context, db *gorm.DB, offline time.Duration, retentionDays int, broadcast func(string)) {
+	db = db.WithContext(ctx)
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	lastCleanup := time.Time{}
@@ -51,15 +52,8 @@ func Monitor(ctx context.Context, db *gorm.DB, offline time.Duration, retentionD
 				if err := CleanupSecurity(db, now); err != nil {
 					log.Printf("security retention: %v", err)
 				}
-				cutoff := now.Add(-time.Duration(retentionDays) * 24 * time.Hour)
-				for _, entry := range []struct {
-					Model  any
-					Column string
-					Before time.Time
-				}{{&models.Metric{}, "created_at", cutoff}, {&models.SystemLog{}, "created_at", cutoff}, {&models.Session{}, "expires_at", now}} {
-					if err := db.Where(entry.Column+" < ?", entry.Before).Delete(entry.Model).Error; err != nil {
-						log.Printf("retention cleanup: %v", err)
-					}
+				if err := CleanupMonitoring(ctx, db, now, retentionDays); err != nil {
+					log.Printf("retention cleanup: %v", err)
 				}
 				lastCleanup = now
 			}

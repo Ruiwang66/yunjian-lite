@@ -392,6 +392,10 @@ func cacheWebsiteCheck(tx *gorm.DB, s models.Server, w models.Website, check sha
 	return tx.Model(&w).Updates(map[string]any{"status": check.Status, "updated_at": now}).Error
 }
 func validWebsiteCheck(check shared.WebsiteCheck) bool {
+	// Agent clock values are metadata, never the persistence/retention clock.
+	if check.CheckedAt <= 0 || check.CheckedAt > time.Now().Add(5*time.Minute).UnixMilli() {
+		return false
+	}
 	if !shared.ValidDomain(check.Domain) || len(check.A)+len(check.AAAA) > 32 || len(check.TLS.Chain) > 8 || len(check.Warnings) > 20 || len(check.Error) > 512 || len(check.TLS.Error) > 512 || len(check.TLS.Issuer) > 512 || len(check.TLS.Warning) > 240 || len(check.Status) > 32 || len(check.TLS.Status) > 32 || len(check.TLS.Version) > 32 || check.HTTPStatus < 0 || check.HTTPStatus > 599 || check.ResponseMS < 0 || check.ResponseMS > 120000 {
 		return false
 	}

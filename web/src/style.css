@@ -1541,6 +1541,12 @@ nav a.active {
   font-size: 13px;
   line-height: 1.7;
 }
+.command-output {
+  scrollbar-width: none;
+}
+.command-output::-webkit-scrollbar {
+  display: none;
+}
 .system-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -19,6 +19,7 @@ func managementLoop(ctx context.Context, client *http.Client, origin, key string
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	var pending *shared.ManagementResult
+	var pendingUntil time.Time
 	for {
 		select {
 		case <-ctx.Done():
@@ -26,6 +27,10 @@ func managementLoop(ctx context.Context, client *http.Client, origin, key string
 		case <-ticker.C:
 		}
 		if pending != nil {
+			if time.Now().After(pendingUntil) {
+				pending = nil // Outcome unknown; never re-execute an already leased task.
+				continue
+			}
 			body, _ := json.Marshal(pending)
 			req, _ := http.NewRequestWithContext(ctx, "POST", origin+"/api/agent/operations/result", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -36,7 +41,7 @@ func managementLoop(ctx context.Context, client *http.Client, origin, key string
 			}
 			io.Copy(io.Discard, io.LimitReader(resp.Body, 65536))
 			resp.Body.Close()
-			if resp.StatusCode == 200 || resp.StatusCode == 409 || resp.StatusCode == 410 || resp.StatusCode == 401 || resp.StatusCode == 404 {
+			if resp.StatusCode == 200 || resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != 408 && resp.StatusCode != 429 {
 				pending = nil
 			}
 			continue
@@ -83,6 +88,10 @@ func managementLoop(ctx context.Context, client *http.Client, origin, key string
 			}
 		}
 		pending = &result
+		pendingUntil = time.UnixMilli(task.ExpiresAt).Add(5 * time.Second)
+		if limit := time.Now().Add(2 * time.Minute); pendingUntil.After(limit) {
+			pendingUntil = limit
+		}
 		log.Printf("Management operation completed: %s success=%t", task.Request.Action, result.Success)
 	}
 }

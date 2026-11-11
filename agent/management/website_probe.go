@@ -20,7 +20,7 @@ func publicAddress(ip net.IP) bool {
 	if ip == nil || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 		return false
 	}
-	for _, cidr := range []string{"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32", "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16"} {
+	for _, cidr := range []string{"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32", "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16", "::/96", "100::/64", "2001::/32", "fec0::/10"} {
 		_, block, _ := net.ParseCIDR(cidr)
 		if block.Contains(ip) {
 			return false
@@ -29,6 +29,10 @@ func publicAddress(ip net.IP) bool {
 	return true
 }
 func probeWebsite(ctx context.Context, domain string) shared.WebsiteCheck {
+	return probeWebsiteUsing(ctx, domain, net.DefaultResolver.LookupIPAddr, (&net.Dialer{Timeout: 2 * time.Second}).DialContext)
+}
+
+func probeWebsiteUsing(ctx context.Context, domain string, resolve func(context.Context, string) ([]net.IPAddr, error), connect func(context.Context, string, string) (net.Conn, error)) shared.WebsiteCheck {
 	result := shared.WebsiteCheck{Domain: domain, Status: "异常", A: []string{}, AAAA: []string{}, Warnings: []string{}, CheckedAt: time.Now().UnixMilli(), TLS: shared.TLSInfo{Status: "未检测", Chain: []string{}}}
 	if !shared.ValidDomain(domain) {
 		result.Error = "域名无效"
@@ -36,7 +40,7 @@ func probeWebsite(ctx context.Context, domain string) shared.WebsiteCheck {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
-	ips, err := net.DefaultResolver.LookupIPAddr(ctx, domain)
+	ips, err := resolve(ctx, domain)
 	if err != nil || len(ips) == 0 {
 		result.Status = "解析失败"
 		result.Error = "DNS 解析失败"
@@ -64,7 +68,7 @@ func probeWebsite(ctx context.Context, domain string) shared.WebsiteCheck {
 		}
 		var last error
 		for _, ip := range ips {
-			conn, e := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(ip.IP.String(), port))
+			conn, e := connect(ctx, "tcp", net.JoinHostPort(ip.IP.String(), port))
 			if e == nil {
 				return conn, nil
 			}

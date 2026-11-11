@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import { request } from "../api";
+import { createRefresh } from "../refresh";
 import { date } from "../format";
 const items = ref([]),
   total = ref(0),
@@ -51,33 +52,40 @@ const actions = {
   "command.network": "查看网络",
   "command.journal": "查看系统日志",
 };
-async function refresh() {
-  if (loading.value) return;
-  loading.value = true;
-  try {
-    const r = await request(
+const refresh = createRefresh(
+  async (signal) => {
+    loading.value = true;
+    return request(
       "/operation-logs?" +
         new URLSearchParams({ page: page.value, status: status.value }),
+      { signal },
     );
+  },
+  (r) => {
     items.value = r.items;
     total.value = r.total;
     error.value = "";
-  } catch (e) {
+  },
+  (e) => {
     error.value = e.message;
-  } finally {
+  },
+  () => {
     loading.value = false;
-  }
-}
-watch(page, refresh);
+  },
+);
+watch(page, () => refresh(true));
 watch(status, () => {
   page.value = 1;
-  refresh();
+  refresh(true);
 });
 onMounted(() => {
   refresh();
   timer = setInterval(refresh, 5000);
 });
-onUnmounted(() => clearInterval(timer));
+onUnmounted(() => {
+  clearInterval(timer);
+  refresh.stop();
+});
 </script>
 <template>
   <div class="page-heading">

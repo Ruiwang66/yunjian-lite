@@ -12,6 +12,7 @@ export function startLive(publicView = false) {
   stopLive();
   mode = next;
   const current = generation;
+  let retries = 0;
   function connect() {
     if (generation !== current) return;
     const connection = new WebSocket(
@@ -24,6 +25,7 @@ export function startLive(publicView = false) {
     connection.onopen = () => {
       if (generation !== current) return;
       live.value = true;
+      retries = 0;
       revision.value++;
     };
     connection.onmessage = () => {
@@ -32,7 +34,8 @@ export function startLive(publicView = false) {
     connection.onclose = () => {
       if (generation !== current) return;
       live.value = false;
-      timer = setTimeout(connect, 5000);
+      const delay = Math.min(30000, 1000 * 2 ** Math.min(retries++, 5));
+      timer = setTimeout(connect, delay + Math.floor(Math.random() * 1000));
     };
     connection.onerror = () => connection.close();
   }

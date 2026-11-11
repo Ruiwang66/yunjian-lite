@@ -123,6 +123,7 @@ server {
     ssl_certificate /path/fullchain.pem;
     ssl_certificate_key /path/privkey.pem;
     location / {
+        client_max_body_size 64k;
         proxy_pass http://127.0.0.1:5050;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -131,6 +132,9 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_read_timeout 120s;
+        # 下载在应用内最多 5 分钟；WebSocket 由 25 秒心跳维持。
+        proxy_send_timeout 300s;
+        send_timeout 300s;
     }
 }
 ```
@@ -216,7 +220,7 @@ systemctl stop cloud-agent
 
 客户端每 4 秒上报，控制台允许五分钟时钟偏差，并拒绝倒序和重复上报；所有机器应同步时钟，一条记录不要运行多个客户端。若无法同时升级，可短期使用 ALLOW_LEGACY_REPORTS=true，完成升级后立即改回 false。旧客户端缺失字段时会被默认拒绝，不会删除历史数据。
 
-API 限额为每 IP 5 次/秒、突发 60；WebSocket 总量 256、每 IP 8。大量同 NAT 的客户端与浏览器会共享 IP 限额，应按规模审慎调整源码参数并配合反代限流。不要关闭校验来适配不可信代理。
+v0.5 匿名前台/登录每可信来源 IP 5 次/秒、突发 60；私有与 Agent 入站分别为每来源 128 次/秒、突发 512，认证后每账户/每节点各 5 次/秒、突发 60。WebSocket 总量 256，公开连接每来源 8，私有连接每账户 8；正常 NAT 节点不共用单个节点的预算。仍需按真实规模配置反代入口与带宽防护。不要通过信任任意转发头或提升 Agent 权限解决限额问题。完整默认值和升级要求见 [v0.5 升级说明](V0.5-UPGRADE.md)。
 
 自动安装新增下载校验接口，需要控制台也提供 /api/agent/downloads/:file/sha256。安装脚本和二进制必须来自同一版本。Windows 自动安装服务账户改为 LocalService，应在目标 Windows Server 上验证开机启动与需要监控的卷是否可读。
 

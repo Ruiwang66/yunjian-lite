@@ -14,10 +14,10 @@ export async function request(path, options = {}) {
   return body;
 }
 export const publicApi = {
-  servers: () => request("/public/servers"),
-  server: (id) => request("/public/servers/" + id),
-  history: (id, hours) =>
-    request("/public/servers/" + id + "/metrics?hours=" + hours),
+  servers: (options) => request("/public/servers", options),
+  server: (id, options) => request("/public/servers/" + id, options),
+  history: (id, hours, options) =>
+    request("/public/servers/" + id + "/metrics?hours=" + hours, options),
 };
 export const api = {
   me: () => request("/auth/me"),
@@ -26,8 +26,8 @@ export const api = {
   logout: () => request("/auth/logout", { method: "POST" }),
   password: (data) =>
     request("/auth/password", { method: "POST", body: JSON.stringify(data) }),
-  servers: () => request("/servers"),
-  server: (id) => request(`/servers/${id}`),
+  servers: (options) => request("/servers", options),
+  server: (id, options) => request(`/servers/${id}`, options),
   create: (name, country_code = "") =>
     request("/servers", {
       method: "POST",
@@ -46,6 +46,8 @@ export const api = {
     }),
   remove: (id) => request(`/servers/${id}`, { method: "DELETE" }),
   token: (id) => request(`/servers/${id}/token`, { method: "POST" }),
-  history: (id, hours) => request(`/servers/${id}/metrics?hours=${hours}`),
-  logs: (params = {}) => request("/logs?" + new URLSearchParams(params)),
+  history: (id, hours, options) =>
+    request(`/servers/${id}/metrics?hours=${hours}`, options),
+  logs: (params = {}, options) =>
+    request("/logs?" + new URLSearchParams(params), options),
 };

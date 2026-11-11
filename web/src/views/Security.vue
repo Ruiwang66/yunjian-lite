@@ -58,7 +58,7 @@ async function execute(item) {
   </div>
   <div class="panel management-panel">
     <h2>命令结果</h2>
-    <pre class="operation-output">{{
+    <pre class="operation-output command-output" tabindex="0" aria-label="命令输出">{{
       output || "选择服务器，再执行上方命令。"
     }}</pre>
     <p class="small muted">

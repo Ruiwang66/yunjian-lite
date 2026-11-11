@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, KeyRound, Pencil, Trash2 } from "lucide-vue-next";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { api, publicApi } from "../api";
+import { createRefresh } from "../refresh";
 const props = defineProps({ publicView: Boolean });
 import { canOperate } from "../management";
 import { revision } from "../state";
@@ -23,33 +24,30 @@ const route = useRoute(),
   tokenOpen = ref(false),
   removeOpen = ref(false),
   now = ref(Date.now());
-let poll,
-  clock,
-  busy = false;
-async function refresh() {
-  if (busy || removeOpen.value) return;
-  busy = true;
-  try {
-    const [s, h, l] = await Promise.all([
-      (props.publicView ? publicApi : api).server(route.params.id),
+let poll, clock;
+const refresh = createRefresh(
+  (signal) =>
+    Promise.all([
+      (props.publicView ? publicApi : api).server(route.params.id, { signal }),
       (props.publicView ? publicApi : api).history(
         route.params.id,
         hours.value,
+        { signal },
       ),
       props.publicView
         ? Promise.resolve({ items: [] })
-        : api.logs({ server_id: route.params.id, limit: 10 }),
-    ]);
+        : api.logs({ server_id: route.params.id, limit: 10 }, { signal }),
+    ]),
+  ([s, h, l]) => {
     server.value = s;
     history.value = h;
     logs.value = l.items;
     error.value = "";
-  } catch (e) {
+  },
+  (e) => {
     error.value = e.message;
-  } finally {
-    busy = false;
-  }
-}
+  },
+);
 async function rename() {
   try {
     const { value } = await ElMessageBox.prompt(
@@ -90,16 +88,29 @@ function remove() {
 }
 onMounted(() => {
   refresh();
-  poll = setInterval(refresh, 4000);
+  poll = setInterval(() => {
+    if (!removeOpen.value) refresh();
+  }, 4000);
   clock = setInterval(() => (now.value = Date.now()), 1000);
 });
 onUnmounted(() => {
+  refresh.stop();
   clearInterval(poll);
   clearInterval(clock);
 });
-watch(revision, refresh);
-watch(hours, refresh);
-watch(() => route.params.id, refresh);
+watch(revision, () => {
+  if (!removeOpen.value) refresh();
+});
+watch(hours, () => refresh(true));
+watch(
+  () => route.params.id,
+  () => {
+    server.value = null;
+    history.value = [];
+    logs.value = [];
+    refresh(true);
+  },
+);
 </script>
 <template>
   <router-link :to="publicView ? '/' : '/servers'" class="back-link"

@@ -4,6 +4,8 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 $goExe = Join-Path $projectRoot '.tools\go\bin\go.exe'
 if (!(Test-Path -LiteralPath $goExe)) { $goExe = (Get-Command go -ErrorAction Stop).Source }
+$npmExe = Join-Path $projectRoot '.tools\node\node-v24.22.2-win-x64\npm.cmd'
+if (!(Test-Path -LiteralPath $npmExe)) { $npmExe = (Get-Command npm.cmd -ErrorAction Stop).Source }
 $env:GOPATH = Join-Path $projectRoot '.cache\gopath'
 $env:GOCACHE = Join-Path $projectRoot '.cache\go-build'
 $env:GOTMPDIR = Join-Path $projectRoot '.cache\tmp'
@@ -32,8 +34,8 @@ try {
 } finally {
  $env:GOOS = $previousOS; $env:GOARCH = $previousArch; $env:CGO_ENABLED = $previousCGO
 }
-npm.cmd ci --prefix web --registry=https://registry.npmjs.org
+& $npmExe ci --prefix web --registry=https://registry.npmjs.org --ignore-scripts
 if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
-npm.cmd run build --prefix web
+& $npmExe run build --prefix web
 if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' }
 Write-Output 'Release programs: bin/ and web/dist/'

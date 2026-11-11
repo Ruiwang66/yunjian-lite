@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, watch } from "vue";
 import { RefreshCw } from "lucide-vue-next";
 import { api } from "../api";
+import { createRefresh } from "../refresh";
 import { revision } from "../state";
 import { date, eventMessage } from "../format";
 const logs = ref([]),
@@ -12,22 +13,24 @@ const logs = ref([]),
   total = ref(0),
   error = ref(""),
   loading = ref(false);
-let poll,
-  busy = false;
-async function refresh() {
-  if (busy) return;
-  busy = true;
-  loading.value = true;
-  try {
-    const [l, s] = await Promise.all([
-      api.logs({
-        limit: 20,
-        page: page.value,
-        ...(level.value ? { level: level.value } : {}),
-        ...(serverID.value ? { server_id: serverID.value } : {}),
-      }),
-      api.servers(),
+let poll;
+const refresh = createRefresh(
+  async (signal) => {
+    loading.value = true;
+    return Promise.all([
+      api.logs(
+        {
+          limit: 20,
+          page: page.value,
+          ...(level.value ? { level: level.value } : {}),
+          ...(serverID.value ? { server_id: serverID.value } : {}),
+        },
+        { signal },
+      ),
+      api.servers({ signal }),
     ]);
+  },
+  ([l, s]) => {
     logs.value = l.items.map((item) => ({
       ...item,
       message: eventMessage(item.message),
@@ -35,23 +38,27 @@ async function refresh() {
     total.value = l.total;
     servers.value = s;
     error.value = "";
-  } catch (e) {
+  },
+  (e) => {
     error.value = e.message;
-  } finally {
-    busy = false;
+  },
+  () => {
     loading.value = false;
-  }
-}
+  },
+);
 onMounted(() => {
   refresh();
   poll = setInterval(refresh, 4000);
 });
-onUnmounted(() => clearInterval(poll));
+onUnmounted(() => {
+  clearInterval(poll);
+  refresh.stop();
+});
 watch(revision, refresh);
-watch(page, refresh);
+watch(page, () => refresh(true));
 watch([level, serverID], () => {
   page.value = 1;
-  refresh();
+  refresh(true);
 });
 </script>
 <template>

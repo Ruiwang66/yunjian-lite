@@ -132,7 +132,7 @@ async function copy(value = command.value, isKey = false) {
         内存限制，不增加容器权限。与运维管理互斥。
       </p>
       <el-checkbox v-model="management" @change="selectManagement"
-        >启用运维管理（v0.2–v0.4）</el-checkbox
+        >启用运维管理（v0.2–v0.5）</el-checkbox
       >
       <p class="small muted">
         启用后客户端使用 root 执行白名单操作，支持

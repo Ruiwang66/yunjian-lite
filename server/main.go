@@ -7,6 +7,7 @@ import (
 	"cloudease-lite/server/database"
 	"cloudease-lite/server/service"
 	live "cloudease-lite/server/websocket"
+	"cloudease-lite/shared"
 	"context"
 	"flag"
 	"log"
@@ -74,7 +75,7 @@ func main() {
 	}()
 	server := &http.Server{Addr: cfg.Listen, Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 * 1024}
 	go func() {
-		log.Printf("CloudEase Lite v0.4 listening on %s", cfg.Listen)
+		log.Printf("CloudEase Lite v%s listening on %s", shared.Version, cfg.Listen)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("HTTP server: %v", err)
 			stop()

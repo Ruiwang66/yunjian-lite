@@ -26,6 +26,9 @@ type requestLimiter struct {
 
 func newLimiter() *requestLimiter { return &requestLimiter{entries: map[string]bucket{}} }
 func (l *requestLimiter) allow(key string, now time.Time) bool {
+	return l.allowBudget(key, now, 5, 60)
+}
+func (l *requestLimiter) allowBudget(key string, now time.Time, rate, burst float64) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if now.Sub(l.sweep) > time.Minute {
@@ -41,11 +44,11 @@ func (l *requestLimiter) allow(key string, now time.Time) bool {
 		if len(l.entries) >= 10000 {
 			return false
 		}
-		b = bucket{tokens: 60, at: now}
+		b = bucket{tokens: burst, at: now}
 	}
-	b.tokens += now.Sub(b.at).Seconds() * 5
-	if b.tokens > 60 {
-		b.tokens = 60
+	b.tokens += now.Sub(b.at).Seconds() * rate
+	if b.tokens > burst {
+		b.tokens = burst
 	}
 	b.at = now
 	if b.tokens < 1 {
@@ -55,6 +58,14 @@ func (l *requestLimiter) allow(key string, now time.Time) bool {
 	b.tokens--
 	l.entries[key] = b
 	return true
+}
+func (a *API) requestBudget(c *gin.Context, key string, rate, burst float64) bool {
+	if a.limiter == nil || a.limiter.allowBudget(key, time.Now(), rate, burst) {
+		return true
+	}
+	c.Header("Retry-After", "1")
+	fail(c, 429, "请求过于频繁，请稍后重试")
+	return false
 }
 func decodeJSON(c *gin.Context, out any) bool {
 	media, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
@@ -129,10 +140,24 @@ func (a *API) securityHeaders(c *gin.Context) {
 	path := c.Request.URL.Path
 	if strings.HasPrefix(path, "/api/") {
 		c.Header("Cache-Control", "no-store")
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 65536)
-		if a.limiter != nil && !a.limiter.allow(c.ClientIP(), time.Now()) {
-			c.Header("Retry-After", "1")
-			fail(c, 429, "请求过于频繁，请稍后重试")
+		bodyLimit := int64(65536) // Report/result and base64 uploads retain their existing budget.
+		if path == "/api/auth/login" || path == "/api/auth/password" || strings.HasPrefix(path, "/api/users") {
+			bodyLimit = 2048
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bodyLimit)
+		// Authenticate before applying the normal per-identity budget. A larger
+		// ingress budget still bounds unauthenticated work without grouping all
+		// normal Agents or users behind a NAT into a single five-request quota.
+		rate, burst := float64(128), float64(512)
+		scope := "private:"
+		if strings.HasPrefix(path, "/api/agent/") {
+			scope = "agent:"
+		}
+		if strings.HasPrefix(path, "/api/public/") || path == "/api/auth/login" {
+			rate, burst = 5, 60
+			scope = "public:"
+		}
+		if !a.requestBudget(c, "ingress:"+scope+c.ClientIP(), rate, burst) {
 			return
 		}
 	}

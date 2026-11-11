@@ -50,7 +50,10 @@ export function useManagement() {
     error = ref("");
   let generation = 0,
     controller;
+  let disposed = false;
+  const initialController = new AbortController();
   async function loadInfo() {
+    if (disposed) return;
     const current = ++generation;
     controller?.abort();
     controller = new AbortController();
@@ -103,19 +106,24 @@ export function useManagement() {
   watch(selected, loadInfo);
   onMounted(async () => {
     try {
-      servers.value = await api.servers();
+      const items = await api.servers({ signal: initialController.signal });
+      if (disposed) return;
+      servers.value = items;
       if (!servers.value.some((s) => s.id === selected.value))
         selected.value = servers.value[0]?.id || null;
       else await loadInfo();
       if (!selected.value) loading.value = false;
     } catch (e) {
+      if (disposed || e.name === "AbortError") return;
       error.value = e.message;
       loading.value = false;
     }
   });
   onUnmounted(() => {
+    disposed = true;
     generation++;
     controller?.abort();
+    initialController.abort();
   });
   return reactive({
     servers,

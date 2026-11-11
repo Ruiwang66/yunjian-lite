@@ -12,20 +12,21 @@ import (
 )
 
 type client struct {
-	send chan []byte
-	stop chan struct{}
-	key  string
+	send   chan []byte
+	stop   chan struct{}
+	key    string
+	public bool
 }
 type Hub struct {
-	mu                        sync.Mutex
-	clients                   map[*client]struct{}
-	counts                    map[string]int
-	total, maxTotal, maxPerIP int
-	closed                    bool
+	mu                            sync.Mutex
+	clients                       map[*client]struct{}
+	counts                        map[string]int
+	total, maxTotal, maxPerSource int
+	closed                        bool
 }
 
 func New() *Hub {
-	return &Hub{clients: map[*client]struct{}{}, counts: map[string]int{}, maxTotal: 256, maxPerIP: 8}
+	return &Hub{clients: map[*client]struct{}{}, counts: map[string]int{}, maxTotal: 256, maxPerSource: 8}
 }
 func (h *Hub) Broadcast(kind string) {
 	payload, _ := json.Marshal(map[string]any{"type": kind, "at": time.Now().UTC()})
@@ -35,6 +36,9 @@ func (h *Hub) Broadcast(kind string) {
 		return
 	}
 	for c := range h.clients {
+		if c.public && kind != "metrics_updated" && kind != "status_changed" && kind != "servers_changed" {
+			continue
+		}
 		select {
 		case c.send <- payload:
 		default:
@@ -55,7 +59,7 @@ func (h *Hub) Close() {
 func (h *Hub) reserve(key string) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.closed || h.total >= h.maxTotal || h.counts[key] >= h.maxPerIP {
+	if h.closed || h.total >= h.maxTotal || h.counts[key] >= h.maxPerSource {
 		return false
 	}
 	h.total++
@@ -76,19 +80,30 @@ func (h *Hub) release(c *client) {
 // Authenticated handlers check sessions before upgrade; the default origin
 // check rejects a different browser host. The API also compares the scheme.
 func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, expires time.Time, authValid func() bool, sourceIP ...string) {
+	h.serve(w, r, expires, authValid, false, sourceIP...)
+}
+func (h *Hub) ServePublic(w http.ResponseWriter, r *http.Request, expires time.Time, sourceIP string) {
+	h.serve(w, r, expires, func() bool { return true }, true, sourceIP)
+}
+func (h *Hub) serve(w http.ResponseWriter, r *http.Request, expires time.Time, authValid func() bool, public bool, sourceIP ...string) {
 	key, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		key = r.RemoteAddr
 	}
-	if len(sourceIP) == 1 && net.ParseIP(sourceIP[0]) != nil {
+	if len(sourceIP) >= 1 && net.ParseIP(sourceIP[0]) != nil {
 		key = sourceIP[0]
+	}
+	// Only the authenticated HTTP handler supplies this identity; it never
+	// comes from headers, query fields, or WebSocket messages.
+	if !public && len(sourceIP) == 2 {
+		key = sourceIP[1]
 	}
 	if !h.reserve(key) {
 		w.Header().Set("Retry-After", "25")
 		http.Error(w, "WebSocket connection limit reached", 429)
 		return
 	}
-	c := &client{send: make(chan []byte, 8), stop: make(chan struct{}), key: key}
+	c := &client{send: make(chan []byte, 8), stop: make(chan struct{}), key: key, public: public}
 	defer h.release(c)
 	upgrader := websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -128,6 +143,11 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, expires time.Time, a
 		case <-timer.C:
 			return
 		case msg := <-c.send:
+			// Revocation and expiry apply before every notification, including
+			// queued messages; waiting for the heartbeat leaves a stale session live.
+			if !time.Now().Before(expires) || !authValid() {
+				return
+			}
 			if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				return
 			}

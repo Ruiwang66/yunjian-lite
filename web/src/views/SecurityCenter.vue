@@ -314,7 +314,7 @@ onUnmounted(() => {
   <div class="security-center">
     <div class="page-heading">
       <div>
-        <span class="eyebrow">CLOUDEASE / V0.4</span>
+        <span class="eyebrow">CLOUDEASE / V0.5</span>
         <h1><ShieldCheck :size="30" /> 安全中心</h1>
         <p>只读检测、风险解释与人工确认。每一项结论都可查看依据。</p>
       </div>

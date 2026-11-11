@@ -7,6 +7,7 @@ import (
 	"cloudease-lite/server/service"
 	live "cloudease-lite/server/websocket"
 	"cloudease-lite/shared"
+	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -14,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,17 +26,18 @@ type attempt struct {
 	Until time.Time
 }
 type API struct {
-	DB         *gorm.DB
-	Config     config.Config
-	Hub        *live.Hub
-	loginMu    sync.Mutex
-	attempts   map[string]attempt
-	limiter    *requestLimiter
-	loginSlots chan struct{}
+	DB            *gorm.DB
+	Config        config.Config
+	Hub           *live.Hub
+	loginMu       sync.Mutex
+	attempts      map[string]attempt
+	limiter       *requestLimiter
+	loginSlots    chan struct{}
+	downloadSlots chan struct{}
 }
 
 func New(db *gorm.DB, cfg config.Config, hub *live.Hub) *API {
-	return &API{DB: db, Config: cfg, Hub: hub, attempts: map[string]attempt{}, limiter: newLimiter(), loginSlots: make(chan struct{}, 4)}
+	return &API{DB: db, Config: cfg, Hub: hub, attempts: map[string]attempt{}, limiter: newLimiter(), loginSlots: make(chan struct{}, 4), downloadSlots: make(chan struct{}, 16)}
 }
 func fail(c *gin.Context, status int, message string) {
 	c.AbortWithStatusJSON(status, gin.H{"error": message})
@@ -64,8 +67,10 @@ func (a *API) Router() *gin.Engine {
 	}
 	r.Use(a.securityHeaders)
 	r.GET("/healthz", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
 		sqlDB, err := a.DB.DB()
-		if err != nil || sqlDB.Ping() != nil {
+		if err != nil || sqlDB.PingContext(ctx) != nil {
 			fail(c, 503, "database unavailable")
 			return
 		}
@@ -93,7 +98,7 @@ func (a *API) Router() *gin.Engine {
 	r.GET("/api/public/servers/:id", a.publicServer)
 	r.GET("/api/public/servers/:id/metrics", a.history)
 	r.GET("/api/public/ws", func(c *gin.Context) {
-		a.Hub.Serve(c.Writer, c.Request, time.Now().Add(24*time.Hour), func() bool { return true }, c.ClientIP())
+		a.Hub.ServePublic(c.Writer, c.Request, time.Now().Add(24*time.Hour), c.ClientIP())
 	})
 	private := r.Group("/api")
 	private.Use(a.auth, a.audit, a.permissions)
@@ -118,7 +123,7 @@ func (a *API) Router() *gin.Engine {
 		a.Hub.Serve(c.Writer, c.Request, session.ExpiresAt, func() bool {
 			var count int64
 			return a.DB.Model(&models.Session{}).Joins("JOIN users ON users.id = sessions.user_id").Where("sessions.id = ? AND sessions.expires_at > ?", session.ID, time.Now().UTC()).Count(&count).Error == nil && count == 1
-		}, c.ClientIP())
+		}, c.ClientIP(), "user:"+strconv.FormatUint(uint64(session.UserID), 10))
 	})
 	private.GET("/downloads/:file", a.downloadAgent)
 	private.GET("/downloads/:file/sha256", a.downloadChecksum)
@@ -155,6 +160,9 @@ func (a *API) auth(c *gin.Context) {
 	}
 	c.Set("user", u)
 	c.Set("session", s)
+	if !a.requestBudget(c, "user:"+strconv.FormatUint(uint64(u.ID), 10), 5, 60) {
+		return
+	}
 	c.Next()
 }
 func (a *API) cookie(c *gin.Context, value string, maxAge int) {
@@ -173,7 +181,7 @@ func (a *API) allowLogin(ip string) bool {
 		}
 	}
 	v := a.attempts[ip]
-	if v.Count >= 10 || len(a.attempts) >= 10000 {
+	if v.Count >= 10 || v.Count == 0 && len(a.attempts) >= 10000 {
 		return false
 	}
 	if v.Count == 0 {

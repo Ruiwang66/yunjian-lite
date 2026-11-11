@@ -251,7 +251,7 @@ func (a *API) operation(c *gin.Context) {
 		fail(c, 403, "无权读取此操作")
 		return
 	}
-	if (task.Status == "queued" || task.Status == "running") && time.Now().After(task.ExpiresAt) {
+	if (task.Status == "queued" || task.Status == "running") && !time.Now().Before(task.ExpiresAt) {
 		if service.ExpireOperations(a.DB, time.Now().UTC()) != nil {
 			dbError(c)
 			return
@@ -267,6 +267,51 @@ func (a *API) operation(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"id": task.ID, "status": task.Status, "data": result.Data, "error": result.Error, "expires_at": task.ExpiresAt})
 }
+
+// Re-evaluate persisted authorization at both lease and result time. Capabilities
+// only narrow an already authorized task; the Agent still enforces local policy.
+func taskAuthorized(tx *gorm.DB, task models.ManagementTask, s models.Server, now time.Time) (bool, error) {
+	roles := []string{"admin", "operator", "viewer"}
+	if operatorAction(task.Action) {
+		roles = roles[:2]
+	}
+	var count int64
+	if err := tx.Model(&models.Session{}).Joins("JOIN users ON users.id = sessions.user_id").Where("sessions.id = ? AND sessions.user_id = ? AND sessions.expires_at > ? AND users.role IN ?", task.SessionID, task.UserID, now, roles).Count(&count).Error; err != nil {
+		return false, err
+	}
+	var info shared.ManagementInfo
+	if count != 1 || task.KeyHash != s.Token || s.OS != "linux" || json.Unmarshal([]byte(s.ManagementJSON), &info) != nil || !info.Enabled {
+		return false, nil
+	}
+	if task.Action == "security.scan" && !info.SecurityEnabled || strings.HasPrefix(task.Action, "docker.") && shared.MutatingAction(task.Action) && !info.DockerWrite || strings.HasPrefix(task.Action, "service.") && shared.MutatingAction(task.Action) && !info.ServiceWrite || task.Action == "file.upload" && !info.FileWrite {
+		return false, nil
+	}
+	var req shared.ManagementRequest
+	if json.Unmarshal([]byte(task.RequestJSON), &req) != nil {
+		return false, nil
+	}
+	if shared.WebsiteAction(task.Action) && (req.Website == nil || !allowedWebsite(s, *req.Website)) {
+		return false, nil
+	}
+	if strings.HasPrefix(task.Action, "file.") && (req.Root < 0 || req.Root >= len(info.FileRoots)) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func cancelTask(tx *gorm.DB, task models.ManagementTask, now time.Time) error {
+	if err := service.FailSecurityScan(tx, task, "cancelled", "任务授权已失效", now); err != nil {
+		return err
+	}
+	if err := tx.Model(&task).Updates(map[string]any{"status": "cancelled", "request_json": "", "result_json": "", "updated_at": now}).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error; err != nil {
+		return err
+	}
+	return tx.Model(&models.OperationLog{}).Where("id = ?", task.OperationLogID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error
+}
+
 func (a *API) nextOperation(c *gin.Context) {
 	serverID := c.MustGet("agent_server_id").(uint)
 	var reply *shared.ManagementTask
@@ -291,19 +336,12 @@ func (a *API) nextOperation(c *gin.Context) {
 		if err != nil {
 			return err
 		}
-		var u models.User
-		var session models.Session
-		if task.KeyHash != s.Token || tx.First(&u, task.UserID).Error != nil || tx.Where("id = ? AND user_id = ? AND expires_at > ?", task.SessionID, task.UserID, now).First(&session).Error != nil || !validRole(u.Role) || operatorAction(task.Action) && u.Role == "viewer" {
-			if err := service.FailSecurityScan(tx, task, "cancelled", "任务授权已失效", now); err != nil {
-				return err
-			}
-			if err := tx.Model(&task).Updates(map[string]any{"status": "cancelled", "request_json": "", "updated_at": now}).Error; err != nil {
-				return err
-			}
-			if err := tx.Model(&models.BackupTask{}).Where("task_id = ?", task.ID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error; err != nil {
-				return err
-			}
-			return tx.Model(&models.OperationLog{}).Where("id = ?", task.OperationLogID).Updates(map[string]any{"status": "cancelled", "updated_at": now}).Error
+		authorized, err := taskAuthorized(tx, task, s, now)
+		if err != nil {
+			return err
+		}
+		if !authorized {
+			return cancelTask(tx, task, now)
 		}
 		lease, err := service.RandomToken()
 		if err != nil {
@@ -359,9 +397,17 @@ func (a *API) operationResult(c *gin.Context) {
 		if err := tx.First(&s, "id = ? AND token = ?", serverID, c.MustGet("agent_key_hash").(string)).Error; err != nil {
 			return err
 		}
-		if task.LeaseHash != service.HashToken(in.Lease) || task.KeyHash != s.Token || task.Status != "running" || now.After(task.ExpiresAt) {
+		if task.LeaseHash != service.HashToken(in.Lease) || task.KeyHash != s.Token || task.Status != "running" || !now.Before(task.ExpiresAt) {
 			conflict = true
 			return nil
+		}
+		authorized, err := taskAuthorized(tx, task, s, now)
+		if err != nil {
+			return err
+		}
+		if !authorized {
+			conflict = true
+			return cancelTask(tx, task, now)
 		}
 		if in.Success {
 			if !strings.HasPrefix(task.Action, "file.") {

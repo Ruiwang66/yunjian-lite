@@ -44,7 +44,7 @@ func validReport(r shared.Report) bool {
 		}
 	}
 	for _, v := range []float64{r.NetworkRXRate, r.NetworkTXRate} {
-		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > math.MaxInt64 {
 			return false
 		}
 	}
@@ -127,8 +127,8 @@ func (a *API) report(c *gin.Context) {
 						if check.Domain == w.Domain {
 							var old models.HealthCheck
 							tx.Where("website_id = ?", w.ID).First(&old)
-							if check.CheckedAt > old.UpdatedAt.UnixMilli() {
-								if err := cacheWebsiteCheck(tx, s, w, check, time.UnixMilli(check.CheckedAt).UTC()); err != nil {
+							if check.CheckedAt > old.UpdatedAt.UnixMilli() || old.UpdatedAt.After(now.Add(5*time.Minute)) {
+								if err := cacheWebsiteCheck(tx, s, w, check, now); err != nil {
 									return err
 								}
 							}

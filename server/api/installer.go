@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"strconv"
 	"strings"
 )
 
@@ -45,5 +46,8 @@ func (a *API) agentInstallAuth(c *gin.Context) {
 	}
 	c.Set("agent_server_id", s.ID)
 	c.Set("agent_key_hash", tokenHash)
+	if !a.requestBudget(c, "agent:"+strconv.FormatUint(uint64(s.ID), 10), 5, 60) {
+		return
+	}
 	c.Next()
 }

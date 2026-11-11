@@ -34,6 +34,12 @@ func Open(dir string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	ready := false
+	defer func() {
+		if !ready {
+			_ = sqlDB.Close()
+		}
+	}()
 	sqlDB.SetMaxOpenConns(1)
 	for _, query := range []string{"PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000", "PRAGMA foreign_keys=ON"} {
 		if err := db.Exec(query).Error; err != nil {
@@ -63,5 +69,6 @@ func Open(dir string) (*gorm.DB, error) {
 			}
 		}
 	}
+	ready = true
 	return db, nil
 }

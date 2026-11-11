@@ -12,7 +12,7 @@ import (
 func TestConnectionLimitAndNotificationOnly(t *testing.T) {
 	h := New()
 	h.maxTotal = 2
-	h.maxPerIP = 1
+	h.maxPerSource = 1
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.Serve(w, r, time.Now().Add(time.Hour), func() bool { return true })
 	}))
@@ -67,7 +67,7 @@ func TestConnectionLimitAndNotificationOnly(t *testing.T) {
 func TestTrustedSourceCapsAndFailedUpgradeRelease(t *testing.T) {
 	h := New()
 	h.maxTotal = 2
-	h.maxPerIP = 1
+	h.maxPerSource = 1
 	for i := 0; i < 3; i++ {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "http://example.com", nil)

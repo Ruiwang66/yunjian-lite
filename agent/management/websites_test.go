@@ -158,3 +158,45 @@ func TestWebsiteFileAndSQLiteBackup(t *testing.T) {
 		}
 	}
 }
+
+func TestV05SQLiteBackupIncludesUncheckpointedWAL(t *testing.T) {
+	if mPathLinux() {
+		t.Skip("requires root-owned fixture parents on Linux")
+	}
+	dir := t.TempDir()
+	for _, name := range []string{"site", "backup", "db"} {
+		if err := os.Mkdir(filepath.Join(dir, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	site := SiteConfig{WebsiteSpec: shared.WebsiteSpec{Domain: "fixture.example", RootPath: filepath.Join(dir, "site")}, SQLitePath: filepath.Join(dir, "db", "source.sqlite")}
+	db, err := gorm.Open(sqlite.Open(site.SQLitePath), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, _ := db.DB()
+	defer conn.Close()
+	for _, sql := range []string{"PRAGMA journal_mode=WAL", "CREATE TABLE wal_fixture (value text)", "INSERT INTO wal_fixture VALUES ('uncheckpointed')"} {
+		if err := db.Exec(sql).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if info, err := os.Stat(site.SQLitePath + "-wal"); err != nil || info.Size() == 0 {
+		t.Fatal("test did not create WAL contents", err)
+	}
+	m := &Manager{websites: &websiteManager{config: WebsiteConfig{BackupDir: filepath.Join(dir, "backup")}}}
+	result, err := m.backupSite(context.Background(), site, "database")
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy, err := gorm.Open(sqlite.Open(filepath.Join(dir, "backup", result.Name)), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	copyConn, _ := copy.DB()
+	defer copyConn.Close()
+	var value string
+	if err := copy.Raw("SELECT value FROM wal_fixture").Scan(&value).Error; err != nil || value != "uncheckpointed" {
+		t.Fatal("WAL data missing from consistent snapshot", err)
+	}
+}

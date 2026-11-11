@@ -17,6 +17,14 @@ type serverView struct {
 }
 
 func (a *API) view(s models.Server) serverView {
+	v := a.statusView(s)
+	var m models.Metric
+	if a.DB.Where("server_id = ?", s.ID).Order("created_at desc, id desc").First(&m).Error == nil {
+		v.Latest = &m
+	}
+	return v
+}
+func (a *API) statusView(s models.Server) serverView {
 	// Compute current status as well as persisting transitions in the background worker.
 	if s.LastSeen == nil {
 		s.Status = "pending"
@@ -25,22 +33,39 @@ func (a *API) view(s models.Server) serverView {
 	} else {
 		s.Status = "online"
 	}
-	var m models.Metric
-	v := serverView{Server: s}
-	if a.DB.Where("server_id = ?", s.ID).Order("created_at desc").First(&m).Error == nil {
-		v.Latest = &m
-	}
-	return v
+	return serverView{Server: s}
 }
-func (a *API) servers(c *gin.Context) {
+func (a *API) listViews() ([]serverView, error) {
 	items := []models.Server{}
-	if a.DB.Order("id desc").Find(&items).Error != nil {
-		dbError(c)
-		return
+	if err := a.DB.Order("id desc").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	// One indexed latest-sample lookup per server inside a single SQL query,
+	// rather than an ORM query/connection round trip for each displayed node.
+	latest := []models.Metric{}
+	if len(items) > 0 {
+		ids := a.DB.Table("servers").Select("(SELECT id FROM metrics WHERE metrics.server_id = servers.id ORDER BY created_at DESC, id DESC LIMIT 1)")
+		if err := a.DB.Where("id IN (?)", ids).Find(&latest).Error; err != nil {
+			return nil, err
+		}
+	}
+	byServer := make(map[uint]*models.Metric, len(latest))
+	for i := range latest {
+		byServer[latest[i].ServerID] = &latest[i]
 	}
 	result := make([]serverView, 0, len(items))
 	for _, s := range items {
-		result = append(result, a.view(s))
+		v := a.statusView(s)
+		v.Latest = byServer[s.ID]
+		result = append(result, v)
+	}
+	return result, nil
+}
+func (a *API) servers(c *gin.Context) {
+	result, err := a.listViews()
+	if err != nil {
+		dbError(c)
+		return
 	}
 	c.JSON(200, result)
 }
@@ -181,6 +206,7 @@ func (a *API) deleteServer(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 func (a *API) history(c *gin.Context) {
+	db := a.DB.WithContext(c.Request.Context())
 	var s models.Server
 	if !found(c, a.DB.First(&s, "id = ?", c.Param("id")).Error) {
 		return
@@ -197,8 +223,8 @@ func (a *API) history(c *gin.Context) {
 		bucket = 4
 	}
 	since := time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
-	sub := a.DB.Model(&models.Metric{}).Select("MAX(id)").Where("server_id = ? AND created_at >= ?", s.ID, since).Group("CAST(strftime('%s', created_at) AS INTEGER) / " + strconv.Itoa(bucket))
-	if a.DB.Where("id IN (?)", sub).Order("created_at desc").Find(&items).Error != nil {
+	sub := db.Model(&models.Metric{}).Select("MAX(id)").Where("server_id = ? AND created_at >= ?", s.ID, since).Group("CAST(strftime('%s', created_at) AS INTEGER) / " + strconv.Itoa(bucket))
+	if db.Where("id IN (?)", sub).Order("created_at desc").Find(&items).Error != nil {
 		dbError(c)
 		return
 	}

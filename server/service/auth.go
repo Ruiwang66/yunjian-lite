@@ -38,6 +38,22 @@ func BootstrapAdmin(db *gorm.DB, dir string, reset bool) (bool, error) {
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return false, err
 	}
+	// Atomic filesystem exclusion also covers separate CLI/server processes.
+	// Never let the losing initializer restore/delete the winner's password file.
+	lockPath := filepath.Join(dir, ".admin-initialization.lock")
+	lock, err := os.OpenFile(lockPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return false, fmt.Errorf("admin initialization already active or lock unavailable: %w", err)
+	}
+	defer os.Remove(lockPath)
+	defer lock.Close()
+	// Another process may have completed between the first read and lock acquisition.
+	if err = db.Where("username = ?", "admin").First(&user).Error; err == nil && !reset {
+		return false, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return false, err
+	}
 	password, err := RandomToken()
 	if err != nil {
 		return false, err

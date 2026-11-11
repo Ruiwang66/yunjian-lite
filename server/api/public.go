@@ -23,20 +23,22 @@ type publicServerView struct {
 }
 
 func (a *API) publicView(s models.Server) publicServerView {
-	v := a.view(s)
-	return publicServerView{CountryCode: s.CountryCode, ID: s.ID, Name: s.Name, Status: v.Status, OS: s.OS,
-		Platform: s.Platform, PlatformVersion: s.PlatformVersion, Arch: s.Arch,
-		CPUCores: s.CPUCores, Uptime: s.Uptime, LastSeen: s.LastSeen, Latest: v.Latest}
+	return publicProjection(a.view(s))
+}
+func publicProjection(v serverView) publicServerView {
+	return publicServerView{CountryCode: v.CountryCode, ID: v.ID, Name: v.Name, Status: v.Status, OS: v.OS,
+		Platform: v.Platform, PlatformVersion: v.PlatformVersion, Arch: v.Arch,
+		CPUCores: v.CPUCores, Uptime: v.Uptime, LastSeen: v.LastSeen, Latest: v.Latest}
 }
 func (a *API) publicServers(c *gin.Context) {
-	items := []models.Server{}
-	if a.DB.Order("id desc").Find(&items).Error != nil {
+	items, err := a.listViews()
+	if err != nil {
 		dbError(c)
 		return
 	}
 	result := make([]publicServerView, 0, len(items))
 	for _, s := range items {
-		result = append(result, a.publicView(s))
+		result = append(result, publicProjection(s))
 	}
 	c.JSON(200, result)
 }
