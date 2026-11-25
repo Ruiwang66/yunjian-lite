@@ -1,4 +1,5 @@
 <script setup>
+import AppearanceSettings from "../components/AppearanceSettings.vue";
 import { ref, computed, onMounted } from "vue";
 import { ElMessageBox, ElMessage } from "element-plus";
 import { request } from "../api";
@@ -115,11 +116,8 @@ onMounted(refresh);
     <div>
       <span class="eyebrow">SETTINGS</span>
       <h1>设置</h1>
-      <p>管理账户角色与权限。</p>
+      <p>调整外观、概览布局及账户权限。</p>
     </div>
-    <el-button v-if="admin" :disabled="busy" type="primary" @click="open = true"
-      >添加用户</el-button
-    >
   </div>
   <el-alert
     v-if="error"
@@ -128,6 +126,7 @@ onMounted(refresh);
     :closable="false"
     class="page-error"
   />
+  <AppearanceSettings />
   <div class="panel management-panel">
     <h2>当前账户</h2>
     <p>{{ user?.username }} · {{ roles[user?.role] || "未知角色" }}</p>
@@ -136,7 +135,12 @@ onMounted(refresh);
     </p>
   </div>
   <div v-if="admin" class="panel management-panel">
-    <h2>用户与角色</h2>
+    <div class="settings-heading">
+      <h2>用户与角色</h2>
+      <el-button :disabled="busy" type="primary" @click="open = true"
+        >添加用户</el-button
+      >
+    </div>
     <el-table :data="users"
       ><el-table-column
         prop="username"

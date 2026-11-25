@@ -1,12 +1,12 @@
 {
   "name": "cloudease-lite-web",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test ../tests/frontend-v05.test.mjs",
+    "test": "node --test ../tests/frontend-v05.test.mjs ../tests/appearance-v06.test.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

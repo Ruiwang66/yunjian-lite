@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const Version = "0.5.0"
+const Version = "0.6.0"
 const MaxFileBytes = 32 * 1024
 const MaxOutputBytes = 16 * 1024
 

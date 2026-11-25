@@ -314,7 +314,7 @@ onUnmounted(() => {
   <div class="security-center">
     <div class="page-heading">
       <div>
-        <span class="eyebrow">CLOUDEASE / V0.5</span>
+        <span class="eyebrow">CLOUDEASE / V0.6</span>
         <h1><ShieldCheck :size="30" /> 安全中心</h1>
         <p>只读检测、风险解释与人工确认。每一项结论都可查看依据。</p>
       </div>
@@ -448,7 +448,7 @@ onUnmounted(() => {
             role="img"
             aria-label="安全评分历史趋势"
           >
-            <path d="M20 20V130H580" fill="none" stroke="#dce0e5" />
+            <path d="M20 20V130H580" fill="none" stroke="var(--border)" />
             <polyline
               v-for="(points, i) in scorePoints"
               :key="i"
@@ -898,7 +898,7 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 400;
   margin-left: 8px;
-  color: #929ba8;
+  color: var(--muted);
 }
 .risk-counts {
   display: flex;
@@ -909,11 +909,11 @@ onUnmounted(() => {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: #7e8794;
+  color: var(--muted);
 }
 .risk-counts b {
   font-size: 25px;
-  color: #24282d;
+  color: var(--text);
 }
 .security-trends {
   display: grid;
@@ -923,7 +923,7 @@ onUnmounted(() => {
 .security-trends svg {
   width: 100%;
   height: 160px;
-  color: #343a40;
+  color: var(--text);
 }
 .event-bars {
   min-height: 160px;
@@ -940,29 +940,29 @@ onUnmounted(() => {
 .event-bars i {
   display: inline-block;
   height: 9px;
-  background: #5f6c77;
+  background: var(--surface-alt);
   border-radius: 6px;
 }
 .risk-label {
   font-size: 12px;
   border-radius: 6px;
   padding: 4px 8px;
-  background: #f0f1f3;
+  background: var(--surface-alt);
 }
 .risk-label.high,
 .risk-label.critical {
-  color: #a33c35;
-  background: #fff1ef;
+  color: var(--danger);
+  background: var(--surface-alt);
 }
 .risk-label.medium {
-  color: #816336;
-  background: #faf6ed;
+  color: var(--danger);
+  background: var(--surface-alt);
 }
 .security-evidence {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 18px;
-  background: #f5f6f8;
+  background: var(--surface-alt);
   border-radius: 12px;
 }
 .security-policy {
@@ -979,7 +979,7 @@ onUnmounted(() => {
 }
 .report-check {
   padding: 12px 0;
-  border-bottom: 1px solid #eaedf1;
+  border-bottom: 1px solid var(--border);
 }
 .security-stats button {
   display: flex;

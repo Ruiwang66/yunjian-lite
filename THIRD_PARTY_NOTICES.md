@@ -2,6 +2,8 @@
 
 以下列表来自 go.mod/go.sum 和 web/package-lock.json。对应依赖的许可证原文复制在 docs/licenses/；这些依赖仍保留其自身许可证。Go 标准库许可证也随附。
 
+国旗图标使用 [flag-icons](https://github.com/lipis/flag-icons) v7.6.0 的 4:3 SVG（MIT，Copyright 2013 Panayiotis Lipiridis），按项目支持的地区码复制到 `web/public/assets/flags/` 并随前端离线发布。许可证原文见 [docs/licenses/flag-icons/LICENSE](docs/licenses/flag-icons/LICENSE)，没有增加运行时 npm 依赖或第三方图片请求。
+
 ## Go dependencies
 
 | Module | Version | License files |

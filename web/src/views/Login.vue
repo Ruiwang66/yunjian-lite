@@ -10,6 +10,7 @@ import {
   UserRound,
   ArrowUpRight,
 } from "lucide-vue-next";
+import AppearanceMenu from "../components/AppearanceMenu.vue";
 import { api } from "../api";
 import { user } from "../state";
 const router = useRouter(),
@@ -42,9 +43,11 @@ async function submit() {
           >云简 <span class="login-brand-lite">Lite</span></span
         ></router-link
       >
-      <router-link to="/" class="login-back"
-        >返回前台监控<ArrowUpRight :size="16"
-      /></router-link>
+      <div class="login-tools">
+        <AppearanceMenu /><router-link to="/" class="login-back"
+          >返回前台监控<ArrowUpRight :size="16"
+        /></router-link>
+      </div>
     </header>
     <div class="login-card">
       <section class="login-story">
@@ -79,7 +82,7 @@ async function submit() {
           </div>
         </div>
         <div class="login-story-foot">
-          CLOUDEASE LITE <span>v0.5.0 / OPEN SOURCE</span>
+          CLOUDEASE LITE <span>v0.6.0 / OPEN SOURCE</span>
         </div>
       </section>
       <section class="login-panel">

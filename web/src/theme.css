@@ -1,0 +1,201 @@
+:root {
+  --page: #fcfcfe;
+  --surface: #ffffff;
+  --surface-alt: #f5f6fc;
+  --node-surface: #fafdfc;
+  --text: #25295c;
+  --muted: #626b7b;
+  --border: #dbddf5;
+  --faint: #eef0fb;
+  --accent: #6050c2;
+  --accent-hover: #5141ae;
+  --accent-soft: #efedfc;
+  --accent-ink: #fff;
+  --success: #08784f;
+  --success-fill: #16c58b;
+  --success-bg: #e0f6ec;
+  --danger: #b33936;
+  --danger-bg: #fff0ee;
+  --warning: #86601c;
+  --warning-bg: #fff7e2;
+  --down: #1755ce;
+  --down-bg: #e6efff;
+  --curve-cpu: #6050c2;
+  --curve-memory: #07846e;
+  --curve-disk: #a06419;
+  --glass-surface: rgba(255, 255, 255, 0.88);
+  --glass-blur: 10px;
+  --inverse: #171c2d;
+  --inverse-text: #eef0fc;
+  --el-color-primary: var(--accent);
+  --el-color-primary-dark-2: var(--accent-hover);
+  --el-color-primary-light-3: color-mix(
+    in srgb,
+    var(--accent),
+    var(--surface) 25%
+  );
+  --el-color-primary-light-5: color-mix(
+    in srgb,
+    var(--accent),
+    var(--surface) 45%
+  );
+  --el-color-primary-light-7: color-mix(
+    in srgb,
+    var(--accent),
+    var(--surface) 65%
+  );
+  --el-color-primary-light-8: color-mix(
+    in srgb,
+    var(--accent),
+    var(--surface) 80%
+  );
+  --el-color-primary-light-9: var(--accent-soft);
+  --el-bg-color: var(--surface);
+  --el-bg-color-page: var(--page);
+  --el-bg-color-overlay: var(--surface);
+  --el-text-color-primary: var(--text);
+  --el-text-color-regular: var(--text);
+  --el-text-color-secondary: var(--muted);
+  --el-text-color-placeholder: var(--muted);
+  --el-text-color-disabled: var(--muted);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--faint);
+  --el-border-color-extra-light: var(--faint);
+  --el-fill-color: var(--surface-alt);
+  --el-fill-color-light: var(--surface-alt);
+  --el-fill-color-lighter: var(--faint);
+  --el-fill-color-blank: var(--surface);
+  --el-fill-color-dark: var(--border);
+  --el-fill-color-darker: var(--border);
+  --el-mask-color: rgba(10, 15, 30, 0.65);
+  --el-mask-color-extra-light: rgba(10, 15, 30, 0.35);
+  --el-color-success: var(--success);
+  --el-color-success-light-9: var(--success-bg);
+  --el-color-danger: var(--danger);
+  --el-color-danger-light-9: var(--danger-bg);
+  --el-color-warning: var(--warning);
+  --el-color-warning-light-9: var(--warning-bg);
+  --el-color-info: var(--muted);
+  --el-color-info-light-9: var(--surface-alt);
+}
+html[data-theme="dark"] {
+  --page: #101419;
+  --surface: #191f29;
+  --surface-alt: #222b37;
+  --node-surface: #191f29;
+  --text: #edf1f5;
+  --muted: #adb7c4;
+  --border: #3a4659;
+  --faint: #293343;
+  --accent: #b3a5ff;
+  --accent-hover: #c5baff;
+  --accent-soft: #322b4e;
+  --accent-ink: #161124;
+  --success: #71dfb4;
+  --success-fill: #30c690;
+  --success-bg: #173d33;
+  --danger: #ffaaa4;
+  --danger-bg: #45272c;
+  --warning: #f1ce89;
+  --warning-bg: #423824;
+  --down: #9abfff;
+  --down-bg: #253957;
+  --curve-cpu: #b3a5ff;
+  --curve-memory: #71dfb4;
+  --curve-disk: #f1ce89;
+  --glass-surface: rgba(25, 31, 41, 0.9);
+}
+html[data-accent="graphite"] {
+  --accent: #414852;
+  --accent-hover: #252c36;
+  --accent-soft: #eceef1;
+}
+html[data-accent="blue"] {
+  --accent: #245db8;
+  --accent-hover: #184b9b;
+  --accent-soft: #eaf1fd;
+}
+html[data-accent="teal"] {
+  --accent: #0c716a;
+  --accent-hover: #075852;
+  --accent-soft: #e1f3ef;
+}
+html[data-theme="dark"][data-accent="graphite"] {
+  --accent: #c3cbd7;
+  --accent-hover: #e1e6ee;
+  --accent-soft: #323b48;
+  --accent-ink: #131a22;
+}
+html[data-theme="dark"][data-accent="blue"] {
+  --accent: #8bb7ff;
+  --accent-hover: #b3d0ff;
+  --accent-soft: #213754;
+  --accent-ink: #101c2f;
+}
+html[data-theme="dark"][data-accent="teal"] {
+  --accent: #86dacc;
+  --accent-hover: #b1e9de;
+  --accent-soft: #203f3e;
+  --accent-ink: #102521;
+}
+html[data-glass="clear"] {
+  --glass-blur: 16px;
+  --glass-surface: rgba(255, 255, 255, 0.8);
+}
+html[data-theme="dark"][data-glass="clear"] {
+  --glass-surface: rgba(25, 31, 41, 0.85);
+}
+html {
+  background: var(--page);
+  color: var(--text);
+}
+body {
+  background: var(--page);
+  color: var(--text);
+}
+button,
+input,
+select {
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.glass-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+@supports (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  html:not([data-glass="off"]) .glass-surface {
+    background: var(--glass-surface);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+}
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

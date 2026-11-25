@@ -52,13 +52,13 @@ const cpu = computed(() => path("cpu")),
             :x2="width"
             :y1="y"
             :y2="y"
-            stroke="#e9eaed"
+            stroke="var(--border)"
             stroke-dasharray="4 5"
           />
           <path
             :d="disk"
             fill="none"
-            stroke="#a8acb3"
+            stroke="var(--curve-disk)"
             stroke-width="2"
             vector-effect="non-scaling-stroke"
             stroke-dasharray="5 4"
@@ -66,14 +66,14 @@ const cpu = computed(() => path("cpu")),
           <path
             :d="memory"
             fill="none"
-            stroke="#69717d"
+            stroke="var(--curve-memory)"
             stroke-width="2"
             vector-effect="non-scaling-stroke"
           />
           <path
             :d="cpu"
             fill="none"
-            stroke="#191c21"
+            stroke="var(--curve-cpu)"
             stroke-width="2"
             vector-effect="non-scaling-stroke"
           />

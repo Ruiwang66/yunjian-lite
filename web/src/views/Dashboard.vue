@@ -23,11 +23,15 @@ import {
 } from "lucide-vue-next";
 import { api, publicApi } from "../api";
 import { createRefresh } from "../refresh";
-const props = defineProps({ publicView: Boolean });
+const props = defineProps({ publicView: Boolean, mapExpanded: Boolean });
 import { canOperate } from "../management";
 import { revision } from "../state";
 import { ago, percent, bytes, statusText, date, eventMessage } from "../format";
-import MetricBar from "../components/MetricBar.vue";
+import ServerNodeCard from "../components/ServerNodeCard.vue";
+import MonitorSummary from "../components/MonitorSummary.vue";
+import { dashboard } from "../appearance";
+import { countryName } from "../geography";
+import { X, ChevronDown, ChevronUp } from "lucide-vue-next";
 import AddServer from "../components/AddServer.vue";
 const ServerMap = defineAsyncComponent(
   () => import("../components/ServerMap.vue"),
@@ -38,7 +42,7 @@ const route = useRoute(),
   loading = ref(true),
   error = ref(""),
   addOpen = ref(false),
-  mapOpen = ref(false),
+  mapOpen = ref(props.mapExpanded),
   search = ref(""),
   filter = ref("all"),
   now = ref(Date.now()),
@@ -66,7 +70,7 @@ const visible = computed(() =>
   servers.value.filter(
     (s) =>
       (filter.value === "all" || s.status === filter.value) &&
-      `${s.name} ${s.ip} ${s.platform}`
+      `${s.name} ${props.publicView ? "" : s.ip || ""} ${s.platform || ""} ${s.os || ""} ${s.country_code || ""} ${countryName(s.country_code)}`
         .toLowerCase()
         .includes(search.value.toLowerCase()),
   ),
@@ -76,6 +80,19 @@ const serverListView = computed(
 );
 const title = computed(() =>
   serverListView.value ? "服务器" : "基础设施概览",
+);
+const adminMapOpen = ref(dashboard.mapExpanded);
+watch(
+  () => dashboard.mapExpanded,
+  (value) => {
+    adminMapOpen.value = value;
+  },
+);
+watch(
+  () => props.mapExpanded,
+  (value) => {
+    mapOpen.value = value;
+  },
 );
 let poll, clock;
 const refresh = createRefresh(
@@ -113,7 +130,7 @@ watch(revision, refresh);
 watch(serverListView, () => refresh(true));
 </script>
 <template>
-  <div class="page-heading">
+  <div v-if="!publicView" class="page-heading">
     <div>
       <span class="eyebrow">{{
         serverListView ? "SERVER MANAGEMENT" : "INFRASTRUCTURE OVERVIEW"
@@ -127,20 +144,8 @@ watch(serverListView, () => refresh(true));
         }}
       </p>
     </div>
-    <button
-      v-if="publicView"
-      class="icon-button public-map-toggle"
-      :class="{ active: mapOpen }"
-      :aria-label="mapOpen ? '收起地图' : '展开地图'"
-      :title="mapOpen ? '收起地图' : '展开地图'"
-      :aria-expanded="mapOpen"
-      aria-controls="server-distribution-map"
-      @click="mapOpen = !mapOpen"
-    >
-      <Map :size="20" />
-    </button>
     <el-button
-      v-if="!publicView && canOperate"
+      v-if="canOperate"
       type="primary"
       size="large"
       @click="addOpen = true"
@@ -155,7 +160,13 @@ watch(serverListView, () => refresh(true));
     show-icon
     class="page-error"
   />
-  <div v-if="!serverListView" class="stats-grid">
+  <MonitorSummary
+    v-if="publicView"
+    :servers="servers"
+    :now="now"
+    :loading="loading"
+  />
+  <div v-if="!publicView && !serverListView" class="stats-grid">
     <div class="stat-card">
       <div class="stat-label">服务器总数<Server :size="17" /></div>
       <div class="stat-value">{{ servers.length }}<span>台</span></div>
@@ -186,31 +197,96 @@ watch(serverListView, () => refresh(true));
       <div class="stat-note">在线服务器上下行总速率</div>
     </div>
   </div>
-  <div
-    v-if="!serverListView && (!publicView || mapOpen)"
-    id="server-distribution-map"
-  >
-    <ServerMap
-      :servers="servers"
-      :public-view="publicView"
-      :editable="!publicView && canOperate"
-      @updated="refresh"
-    />
+
+  <div v-if="publicView && mapOpen" id="server-distribution-map">
+    <ServerMap :servers="servers" public-view />
   </div>
-  <section v-if="publicView || serverListView" class="fleet-section">
-    <div class="section-heading">
-      <div>
-        <h2>
-          服务器资源<span class="count-label">{{ servers.length }}</span>
-        </h2>
-        <p>每 4 秒更新 · 超过 90 秒未通信标记为离线</p>
+  <template v-if="!publicView && !serverListView">
+    <section
+      v-for="section in dashboard.sections"
+      :key="section"
+      class="dashboard-module"
+      :data-module="section"
+    >
+      <template v-if="section === 'map'"
+        ><button
+          class="module-toggle"
+          :aria-expanded="adminMapOpen"
+          aria-controls="admin-server-map"
+          @click="adminMapOpen = !adminMapOpen"
+        >
+          <Map :size="17" />服务器地图<component
+            :is="adminMapOpen ? ChevronUp : ChevronDown"
+            :size="17"
+          />
+        </button>
+        <div v-if="adminMapOpen" id="admin-server-map">
+          <ServerMap
+            :servers="servers"
+            :editable="canOperate"
+            @updated="refresh"
+          /></div
+      ></template>
+      <section v-else class="events-panel">
+        <div class="section-heading">
+          <div>
+            <h2>最近活动</h2>
+            <p>连接事件与资源异常，尽在这里</p>
+          </div>
+          <router-link to="/logs" class="text-link"
+            >查看全部<ArrowUpRight :size="15"
+          /></router-link>
+        </div>
+        <div v-if="!logs.length" class="quiet-state">
+          暂无系统事件。监控客户端连接后会在这里显示活动。
+        </div>
+        <div v-for="item in logs" :key="item.id" class="event-row">
+          <span class="log-badge" :class="item.level.toLowerCase()">{{
+            item.level
+          }}</span
+          ><span class="event-message"
+            >{{ eventMessage(item.message)
+            }}<small>{{
+              servers.find((s) => s.id === item.server_id)?.name ||
+              `服务器 #${item.server_id}`
+            }}</small></span
+          ><time>{{ date(item.created_at) }}</time>
+        </div>
+      </section>
+    </section>
+  </template>
+  <section v-if="publicView || serverListView" class="fleet-section node-wall">
+    <div class="node-tools">
+      <label class="search-field"
+        ><Search :size="17" /><input
+          v-model="search"
+          :placeholder="
+            publicView
+              ? '搜索节点名称、地区、系统…'
+              : '搜索节点名称、地区、系统或 IP…'
+          "
+          aria-label="搜索服务器" /><button
+          v-if="search"
+          class="clear-search"
+          aria-label="清除搜索"
+          @click="search = ''"
+        >
+          <X :size="15" /></button
+      ></label>
+      <div class="choice-row">
+        <button class="icon-button" aria-label="刷新服务器" @click="refresh">
+          <RefreshCw :size="16" /></button
+        >
       </div>
-      <button class="icon-button" aria-label="刷新服务器" @click="refresh">
-        <RefreshCw :size="17" />
-      </button>
     </div>
-    <div class="fleet-toolbar">
-      <div class="filter-tabs">
+    <div class="node-filter-row">
+      <p class="node-count">
+        共 {{ servers.length }} 个服务器，{{ online.length }} 个在线<small
+          v-if="search || filter !== 'all'"
+          >匹配 {{ visible.length }} 台</small
+        >
+      </p>
+      <div class="filter-tabs" aria-label="服务器状态筛选">
         <button
           v-for="tab in [
             { key: 'all', label: '全部' },
@@ -220,17 +296,12 @@ watch(serverListView, () => refresh(true));
           ]"
           :key="tab.key"
           :class="{ selected: filter === tab.key }"
+          :aria-pressed="filter === tab.key"
           @click="filter = tab.key"
         >
           {{ tab.label }}
         </button>
       </div>
-      <label class="search-field"
-        ><Search :size="16" /><input
-          v-model="search"
-          :placeholder="publicView ? '搜索服务器名称' : '搜索名称或 IP 地址'"
-          aria-label="搜索服务器"
-      /></label>
     </div>
     <div v-if="loading" class="empty-state">
       <RefreshCw :size="25" />
@@ -238,22 +309,12 @@ watch(serverListView, () => refresh(true));
     </div>
     <div v-else-if="!visible.length" class="empty-state">
       <Server :size="30" />
-      <h3>
-        {{
-          servers.length
-            ? "没有找到匹配的服务器"
-            : publicView
-              ? "暂无服务器数据"
-              : "从连接第一台服务器开始"
-        }}
-      </h3>
+      <h3>{{ servers.length ? "没有找到匹配的服务器" : "暂无服务器数据" }}</h3>
       <p>
         {{
           servers.length
-            ? "试试其他名称，或调整状态筛选。"
-            : publicView
-              ? "管理员添加服务器后，监控数据将显示在这里。"
-              : "生成专属连接密钥，启动监控客户端，即可开始监控。"
+            ? "试试其他名称、地区、系统，或调整状态筛选。"
+            : "监控客户端连接后，数据将显示在这里。"
         }}
       </p>
       <el-button
@@ -263,84 +324,14 @@ watch(serverListView, () => refresh(true));
         >添加服务器</el-button
       >
     </div>
-    <div v-else class="server-grid">
-      <router-link
+    <div v-else class="node-grid compact">
+      <ServerNodeCard
         v-for="s in visible"
         :key="s.id"
-        :to="(publicView ? '/status/servers/' : '/servers/') + s.id"
-        class="server-card"
-        ><div class="server-card-top">
-          <span class="server-icon"
-            ><Server :size="22" :stroke-width="1.5" /></span
-          ><span class="status-pill" :class="s.status"
-            ><i class="status-dot" :class="s.status"></i
-            >{{ statusText[s.status] }}</span
-          >
-        </div>
-        <div class="server-card-name">
-          <h3>{{ s.name }}</h3>
-          <ArrowUpRight :size="17" />
-        </div>
-        <div class="server-address">
-          <span>{{
-            publicView
-              ? s.cpu_cores
-                ? s.cpu_cores + " 逻辑核心"
-                : "等待监控客户端连接"
-              : s.ip || "等待监控客户端连接"
-          }}</span
-          ><span v-if="s.platform"
-            >{{ s.platform }} {{ s.platform_version }}</span
-          >
-        </div>
-        <div class="card-metrics">
-          <MetricBar label="CPU" :value="s.latest?.cpu" /><MetricBar
-            label="内存"
-            :value="s.latest?.memory"
-          /><MetricBar label="磁盘" :value="s.latest?.disk" />
-        </div>
-        <div class="card-network">
-          <span
-            ><ArrowDown :size="13" />{{
-              bytes(s.latest?.network_rx_rate, true)
-            }}</span
-          ><span
-            ><ArrowUp :size="13" />{{
-              bytes(s.latest?.network_tx_rate, true)
-            }}</span
-          >
-        </div>
-        <div class="server-card-foot">
-          <span><Clock3 :size="13" />{{ ago(s.last_seen, now) }}</span
-          ><span>{{ s.arch || "—" }}</span>
-        </div></router-link
-      >
-    </div>
-  </section>
-  <section v-if="!publicView && !serverListView" class="events-panel">
-    <div class="section-heading">
-      <div>
-        <h2>最近活动</h2>
-        <p>连接事件与资源异常，尽在这里</p>
-      </div>
-      <router-link to="/logs" class="text-link"
-        >查看全部<ArrowUpRight :size="15"
-      /></router-link>
-    </div>
-    <div v-if="!logs.length" class="quiet-state">
-      暂无系统事件。监控客户端连接后会在这里显示活动。
-    </div>
-    <div v-for="item in logs" :key="item.id" class="event-row">
-      <span class="log-badge" :class="item.level.toLowerCase()">{{
-        item.level
-      }}</span
-      ><span class="event-message"
-        >{{ eventMessage(item.message)
-        }}<small>{{
-          servers.find((s) => s.id === item.server_id)?.name ||
-          `服务器 #${item.server_id}`
-        }}</small></span
-      ><time>{{ date(item.created_at) }}</time>
+        :server="s"
+        :public-view="publicView"
+        :now="now"
+      />
     </div>
   </section>
   <div class="data-foot">

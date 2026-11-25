@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onUnmounted } from "vue";
+import { ref, watch, onUnmounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   LayoutDashboard,
@@ -20,6 +20,8 @@ import {
   ShieldCheck,
 } from "lucide-vue-next";
 import { ElMessage } from "element-plus";
+import AppearanceMenu from "./components/AppearanceMenu.vue";
+import { loadDashboard } from "./appearance";
 import { api } from "./api";
 import { user, live, startLive, stopLive } from "./state";
 const route = useRoute(),
@@ -27,6 +29,44 @@ const route = useRoute(),
   menu = ref(false),
   passwordOpen = ref(false),
   saving = ref(false);
+const navTrigger = ref(null),
+  navPanel = ref(null);
+watch(() => user.value?.id, loadDashboard, { immediate: true });
+async function openNavigation() {
+  document.dispatchEvent(new Event("navigation-opening"));
+  menu.value = !menu.value;
+  if (menu.value) {
+    await nextTick();
+    navPanel.value?.querySelector("a")?.focus();
+  }
+}
+function closeNavigation() {
+  menu.value = false;
+  nextTick(() => navTrigger.value?.focus());
+}
+function navigationKeys(e) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeNavigation();
+  }
+  if (e.key === "Tab" && menu.value) {
+    const links = [...navPanel.value.querySelectorAll("a")];
+    if (e.shiftKey && document.activeElement === links[0]) {
+      e.preventDefault();
+      links.at(-1).focus();
+    } else if (!e.shiftKey && document.activeElement === links.at(-1)) {
+      e.preventDefault();
+      links[0].focus();
+    }
+  }
+}
+const appearanceOpening = () => {
+  menu.value = false;
+};
+document.addEventListener("appearance-opening", appearanceOpening);
+onUnmounted(() =>
+  document.removeEventListener("appearance-opening", appearanceOpening),
+);
 const form = ref({ current_password: "", new_password: "" });
 watch(
   [() => route.path, () => route.meta.public, () => user.value?.id],
@@ -80,11 +120,24 @@ onUnmounted(() => {
 <template>
   <router-view v-if="route.meta.public" />
   <div v-else class="app-shell">
-    <button class="mobile-menu" aria-label="打开导航" @click="menu = !menu">
+    <button
+      ref="navTrigger"
+      class="mobile-menu"
+      :aria-label="menu ? '关闭导航' : '打开导航'"
+      :aria-expanded="menu"
+      aria-controls="main-navigation"
+      @click="openNavigation"
+    >
       <Menu :size="20" />
     </button>
-    <div v-if="menu" class="menu-shade" @click="menu = false"></div>
-    <aside class="sidebar" :class="{ 'is-open': menu }">
+    <div v-if="menu" class="menu-shade" @click="closeNavigation"></div>
+    <aside
+      id="main-navigation"
+      ref="navPanel"
+      @keydown="navigationKeys"
+      class="sidebar"
+      :class="{ 'is-open': menu }"
+    >
       <router-link to="/admin" class="brand"
         ><span class="brand-mark"><Cloud :size="23" :stroke-width="1.5" /></span
         ><span
@@ -168,12 +221,12 @@ onUnmounted(() => {
           >
         </div>
         <div class="version-row">
-          <span>v0.5.0</span><span>开源 / MIT</span>
+          <span>v0.6.0</span><span>开源 / MIT</span>
         </div>
       </div>
     </aside>
     <div class="main-shell">
-      <header class="topbar">
+      <header class="topbar glass-surface">
         <span class="breadcrumb"
           >工作空间 <span>/</span>
           {{
@@ -198,7 +251,7 @@ onUnmounted(() => {
           <span class="connection"
             ><i :class="{ connected: live }"></i
             >{{ live ? "实时连接" : "轮询刷新" }}</span
-          ><el-dropdown trigger="click"
+          ><AppearanceMenu /><el-dropdown trigger="click"
             ><button class="user-button">
               <span class="avatar">{{
                 user?.username?.slice(0, 1).toUpperCase()
